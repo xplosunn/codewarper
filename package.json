@@ -1,0 +1,20 @@
+{
+  "name": "codewarper",
+  "version": "0.0.1",
+  "packageManager": "pnpm@10.9.0",
+  "type": "module",
+  "imports": {
+    "#schema": "./libs/schema/schema.ts",
+    "#effect": "./libs/effect/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "typescript": "^5.6.3"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/main.ts",
+    "check": "tsc --noEmit && node --experimental-strip-types --check src/main.ts && node --experimental-strip-types -e \"import('./src/main.ts')\" && echo '\nCheck completed successfully!'",
+    "test": "pnpm run check && node --experimental-strip-types --test \"src/**/*.unit.test.ts\" \"libs/**/*.unit.test.ts\"",
+    "test:integration": "node --experimental-strip-types --test test/**/*.integration.test.ts"
+  }
+}
