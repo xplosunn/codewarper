@@ -1,5 +1,5 @@
 {
-  "name": "@xplosunn/codewarper",
+  "name": "codewarper",
   "publishConfig": { "access": "public" },
   "version": "0.0.2",
   "description": "Local-first AI coding agent",
