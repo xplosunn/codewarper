@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import process from "node:process";
 import readline from "node:readline/promises";
 import { pathToFileURL } from "node:url";

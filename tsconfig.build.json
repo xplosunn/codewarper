@@ -6,12 +6,15 @@
     "moduleResolution": "NodeNext",
     "customConditions": ["development"],
     "strict": true,
-    "noEmit": true,
+    "rootDir": ".",
+    "outDir": "dist",
     "types": ["node"],
-    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "allowJs": true
+    "allowJs": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/**/*.ts", "libs/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "libs/**/*.ts"],
+  "exclude": ["**/*.unit.test.ts", "test/**/*.ts"]
 }

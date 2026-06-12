@@ -1,20 +1,37 @@
 {
-  "name": "codewarper",
+  "name": "@xplosunn/codewarper",
+  "publishConfig": { "access": "public" },
   "version": "0.0.1",
+  "description": "Local-first AI coding agent",
   "packageManager": "pnpm@10.9.0",
   "type": "module",
+  "main": "dist/src/main.js",
+  "bin": {
+    "codewarper": "dist/src/main.js"
+  },
+  "files": [
+    "dist/"
+  ],
   "imports": {
-    "#schema": "./libs/schema/schema.ts",
-    "#effect": "./libs/effect/index.ts"
+    "#schema": {
+      "development": "./libs/schema/schema.ts",
+      "default": "./dist/libs/schema/schema.js"
+    },
+    "#effect": {
+      "development": "./libs/effect/index.ts",
+      "default": "./dist/libs/effect/index.js"
+    }
   },
   "devDependencies": {
     "@types/node": "^24.6.0",
     "typescript": "^5.6.3"
   },
   "scripts": {
-    "start": "node --experimental-strip-types src/main.ts",
-    "check": "tsc --noEmit && node --experimental-strip-types --check src/main.ts && node --experimental-strip-types -e \"import('./src/main.ts')\" && echo '\nCheck completed successfully!'",
-    "test": "pnpm run check && node --experimental-strip-types --test \"src/**/*.unit.test.ts\" \"libs/**/*.unit.test.ts\"",
-    "test:integration": "node --experimental-strip-types --test test/**/*.integration.test.ts"
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build",
+    "start": "node --experimental-strip-types --conditions=development src/main.ts",
+    "check": "tsc --noEmit && node --experimental-strip-types --conditions=development --check src/main.ts && node --experimental-strip-types --conditions=development -e \"import('./src/main.ts')\" && echo '\nCheck completed successfully!'",
+    "test": "pnpm run check && node --experimental-strip-types --conditions=development --test \"src/**/*.unit.test.ts\" \"libs/**/*.unit.test.ts\"",
+    "test:integration": "node --experimental-strip-types --conditions=development --test test/**/*.integration.test.ts"
   }
 }

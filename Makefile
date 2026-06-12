@@ -1,2 +1,2 @@
 publish:
-	npm login && npm publish --access public
+	pnpm login && pnpm publish --access public
