@@ -4,4 +4,4 @@ other-coding-agents/
 node_modules/
 dist/
 
-codewarper.js
+codewarper.mjs

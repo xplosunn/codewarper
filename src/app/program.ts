@@ -1,6 +1,7 @@
 import { Effect, type Req } from "#effect";
 import {
   CodewarperConfigService,
+  DEFAULT_CONFIG_FILENAME,
   parseConfigModule,
 } from "../config/load-codewarper.ts";
 import {
@@ -235,7 +236,7 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
         configOrigin = "(no config file)";
         terminal.show({
           type: "system",
-          text: "No config file found. Continuing without tools. Run /reload after creating a codewarper.js to load tools.",
+          text: `No config file found. Continuing without tools. Run /reload after creating a ${DEFAULT_CONFIG_FILENAME} to load tools.`,
         });
         break;
       }
@@ -413,7 +414,7 @@ function handleUserInput(
             ),
             "",
             "Environment variables:",
-            "  CODEWARPER_CONFIG Use a custom config path instead of the default './codewarper.js'. Relative paths are resolved from the working directory.",
+            `  CODEWARPER_CONFIG Use a custom config path instead of the default './${DEFAULT_CONFIG_FILENAME}'. Relative paths are resolved from the working directory.`,
           ].join("\n"),
         });
         return { type: "continue" as const, app };
@@ -510,11 +511,11 @@ function promptForMissingConfigChoice(): Effect<
     const terminal = yield* TerminalService;
     return yield* promptSelect<StartupConfigChoice>(
       terminal,
-      "No codewarper.js found in this directory. What would you like to do?",
+      `No ${DEFAULT_CONFIG_FILENAME} found in this directory. What would you like to do?`,
       [
         { label: "Continue without tools", value: "continue_without_tools" },
         {
-          label: "Create a codewarper.js config file",
+          label: `Create a ${DEFAULT_CONFIG_FILENAME} config file`,
           value: "create_config",
         },
         {

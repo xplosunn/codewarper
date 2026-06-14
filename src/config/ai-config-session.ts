@@ -1,10 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { DEFAULT_CONFIG_FILENAME } from "./load-codewarper.ts";
 import { loadToolsWithValidators, type LoadedTool } from "../tools/loaded-tool.ts";
 import type { Tool } from "../tools/types.ts";
-
-const CONFIG_FILENAME = "codewarper.js";
 
 function resolveWorkspacePath(inputPath: string): string {
   const cwd = process.cwd();
@@ -44,7 +43,7 @@ const readFileTool: Tool = {
 const writeConfigTool: Tool = {
   name: "write_file",
   description:
-    "Create or overwrite a UTF-8 text file inside the current working directory. Creates parent directories if needed. In this session, only codewarper.js can be written.",
+    `Create or overwrite a UTF-8 text file inside the current working directory. Creates parent directories if needed. In this session, only ${DEFAULT_CONFIG_FILENAME} can be written.`,
   inputSchema: {
     type: "object",
     properties: {
@@ -62,10 +61,10 @@ const writeConfigTool: Tool = {
   async run(input: unknown) {
     const i = input as { filePath: string; contents: string };
     const resolved = resolveWorkspacePath(i.filePath);
-    const configPath = path.join(process.cwd(), CONFIG_FILENAME);
+    const configPath = path.join(process.cwd(), DEFAULT_CONFIG_FILENAME);
     if (resolved !== configPath) {
       throw new Error(
-        `This session can only write to ${CONFIG_FILENAME}. Requested: ${i.filePath}`,
+        `This session can only write to ${DEFAULT_CONFIG_FILENAME}. Requested: ${i.filePath}`,
       );
     }
     await mkdir(path.dirname(resolved), { recursive: true });
@@ -82,12 +81,12 @@ export function createAiConfigSessionTools(): LoadedTool[] {
 
 export const AI_CONFIG_SYSTEM_PROMPT = [
   "You are configuring Codewarper for this project.",
-  "You have two tools: read_file (read any file in the workspace) and write_file (write only codewarper.js).",
+  `You have two tools: read_file (read any file in the workspace) and write_file (write only ${DEFAULT_CONFIG_FILENAME}).`,
   "",
   "WORKFLOW:",
-  "1. Read package.json (or equivalent project manifest) and the current codewarper.js to understand the project and config format.",
+  `1. Read package.json (or equivalent project manifest) and the current ${DEFAULT_CONFIG_FILENAME} to understand the project and config format.`,
   "2. Read additional files as needed: linter configs, test setup, build scripts, CI config, etc.",
-  "3. Write an improved codewarper.js that adds project-specific tools: build, test, lint, typecheck, etc.",
+  `3. Write an improved ${DEFAULT_CONFIG_FILENAME} that adds project-specific tools: build, test, lint, typecheck, etc.`,
   "",
   "RULES:",
   "- Keep all existing tools from the template.",
@@ -100,12 +99,12 @@ export const AI_CONFIG_SYSTEM_PROMPT = [
 ].join("\n");
 
 export const AI_CONFIG_USER_PROMPT = [
-  "Analyze this project and update codewarper.js to add tools for iterating on the project:",
+  `Analyze this project and update ${DEFAULT_CONFIG_FILENAME} to add tools for iterating on the project:`,
   "- Building / compiling",
   "- Running tests",
   "- Linting / formatting",
   "- Any other project-specific workflows",
   "",
-  "Start by reading the current codewarper.js and package.json (or equivalent).",
+  `Start by reading the current ${DEFAULT_CONFIG_FILENAME} and package.json (or equivalent).`,
   "Then explore further and write the improved config.",
 ].join("\n");

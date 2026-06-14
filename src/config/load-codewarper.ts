@@ -8,7 +8,8 @@ import { loadToolsWithValidators, type LoadedTool } from "../tools/loaded-tool.t
 import { isJsonValue } from "../tools/json-value.ts";
 import type { Tool } from "../tools/types.ts";
 
-const CONFIG_FILENAME = "codewarper.js";
+/** Default config filename. Uses .mjs so ESM syntax works without "type": "module" in the user's package.json. */
+export const DEFAULT_CONFIG_FILENAME = "codewarper.mjs";
 export const CODEWARPER_CONFIG_ENV_VAR = "CODEWARPER_CONFIG";
 
 export type CodewarperCommand = {
@@ -62,7 +63,7 @@ export function createCodewarperConfigLoader(environment: Environment): Codewarp
 function computeConfigPath(environment: Environment): string {
   const override = environment.get(CODEWARPER_CONFIG_ENV_VAR)?.trim();
   if (override) return path.resolve(process.cwd(), override);
-  return path.join(process.cwd(), CONFIG_FILENAME);
+  return path.join(process.cwd(), DEFAULT_CONFIG_FILENAME);
 }
 
 function validateHooks(raw: unknown): CodewarperHooks | null {

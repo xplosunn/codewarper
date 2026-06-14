@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHttpClient } from "./http-client.ts";
-import type { CodewarperConfig, CodewarperConfigLoader } from "../config/load-codewarper.ts";
+import {
+  DEFAULT_CONFIG_FILENAME,
+  type CodewarperConfig,
+  type CodewarperConfigLoader,
+} from "../config/load-codewarper.ts";
 
 function configLoader(config: Partial<CodewarperConfig>): CodewarperConfigLoader {
   const current: CodewarperConfig = {
@@ -12,7 +16,7 @@ function configLoader(config: Partial<CodewarperConfig>): CodewarperConfigLoader
     ...config,
   };
   return {
-    path: () => "codewarper.js",
+    path: () => DEFAULT_CONFIG_FILENAME,
     current: () => current,
     load: () => { throw new Error("not needed"); },
     setCurrent: () => {},

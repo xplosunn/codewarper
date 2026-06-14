@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { Effect } from "#effect";
-import { loadCodewarperConfigFromPath, parseConfigModule } from "./load-codewarper.ts";
+import { DEFAULT_CONFIG_FILENAME, loadCodewarperConfigFromPath, parseConfigModule } from "./load-codewarper.ts";
 import {
   getInitialCodewarperTemplateConfig,
   INITIAL_CODEWARPER_STARTER_OPTIONS,
@@ -116,7 +116,7 @@ test("initial codewarper config templates load as valid config from disk", async
     await t.test(starter, async () => {
       const dir = await mkdtemp(path.join(tmpdir(), "codewarper-config-template-"));
       try {
-        const configPath = path.join(dir, "codewarper.js");
+        const configPath = path.join(dir, DEFAULT_CONFIG_FILENAME);
 
         const outcome = await writeInitialCodewarperConfigIfMissing(configPath, starter);
         assert.equal(outcome, "created");
