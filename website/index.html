@@ -90,31 +90,6 @@
         z-index: 1;
       }
 
-      .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        width: fit-content;
-        min-height: 30px;
-        padding: 0 12px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.86);
-        border: 1px solid var(--line);
-        color: var(--muted);
-        font-size: 0.68rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .eyebrow::before {
-        content: "";
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: var(--text);
-      }
-
       .hero-copy {
         display: grid;
         gap: 12px;
@@ -193,19 +168,6 @@
         line-height: 1.56;
       }
 
-      .code-block {
-        margin: 0;
-        padding: 16px 18px;
-        background: #f8fafc;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-md);
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.8rem;
-        line-height: 1.65;
-        overflow-x: auto;
-        color: #334155;
-      }
-
       .get-started {
         padding: 20px 24px;
         border-radius: var(--radius-md);
@@ -278,7 +240,6 @@
       <main>
         <section class="main-card">
           <div class="hero-copy">
-            <span class="eyebrow">Now available</span>
             <h1>Codewarper</h1>
             <p class="hero-subhead">
               The coding agent you can standardize on.
@@ -320,28 +281,6 @@
                 </p>
               </div>
             </div>
-          </div>
-
-          <div class="divider"></div>
-
-          <div class="subsection">
-            <h2>Config you can understand.</h2>
-            <p class="body-copy">
-              Easy to get started. You can use a template or let AI write an initial 
-              <code style="font-family: 'IBM Plex Mono', monospace; font-size: 0.88rem; background: rgba(15,23,42,0.06); padding: 1px 5px; border-radius: 4px;">codewarper.js</code>.
-              for you.
-            </p>
-            <pre class="code-block">export default {
-  tools: [ /* file ops, grep, web search, ... */ ],
-  commands: {
-    test: { description: "Run the test suite", async run() { /* ... */ } },
-  },
-  systemPrompt: "You are a concise coding assistant. ...",
-  hooks: {
-    onProviderRequest(req) { /* log it */ },
-    onProviderResponse(req, res) { /* audit it */ },
-  },
-}</pre>
           </div>
 
           <div class="divider"></div>
