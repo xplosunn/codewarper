@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Codewarper</title>
+    <title>Codewarper — the coding agent you can standardize on</title>
     <meta
       name="description"
       content="Codewarper is the coding agent you can standardize on. One config file, zero dependencies, no telemetry."
@@ -283,48 +283,40 @@
             <p class="hero-subhead">
               The coding agent you can standardize on.
             </p>
-            <p class="body-copy">
-              Most coding agents come with tools built in and hope you'll lock
-              them down. Codewarper does the opposite. It only can do what you explicitly configure.
-            </p>
           </div>
 
           <div class="divider"></div>
 
           <div class="subsection">
-            <h2>Configured once. Used consistently.</h2>
+            <h2>No magic. Under your control.</h2>
             <p class="body-copy">
-              The point is not per-user customization. The point is an agent
-              your organization can shape to its own requirements, then adopt
-              as a standard.
+              You can add the config file to your repo.
             </p>
             <div class="list-grid">
               <div class="list-item">
                 <strong>No tools by default</strong>
                 <p>
-                  Ships with zero capabilities. File access, shell commands,
-                  network calls — nothing is available until you add it to the
-                  config.
-                </p>
-              </div>
-              <div class="list-item">
-                <strong>Zero dependencies</strong>
-                <p>
-                  No runtime packages. No supply chain to trust beyond Node.js
-                  itself.
+                  Out of the box it can't touch your files, run shell commands,
+                  or make network calls. You add the tools you want.
                 </p>
               </div>
               <div class="list-item">
                 <strong>No telemetry</strong>
                 <p>
-                  Never phones home. No usage tracking, no crash reports. The
-                  only outbound connections are the provider APIs you configure.
+                  It doesn't phone home. At all. The only outbound connections
+                  are the ones you set up yourself, to the provider APIs.
                 </p>
               </div>
               <div class="list-item">
-                <strong>Auditable code</strong>
+                <strong>Auditable source code</strong>
                 <p>
-                  Full source on GitHub. Review it, fork it, ship it internally.
+                  Source is on GitHub. You can know exactly what you're running.
+                </p>
+              </div>
+              <div class="list-item">
+                <strong>Zero dependencies</strong>
+                <p>
+                  No risk of supply-chain attacks. The only thing you're trusting is Node.js.
                 </p>
               </div>
             </div>
@@ -333,12 +325,11 @@
           <div class="divider"></div>
 
           <div class="subsection">
-            <h2>Let the AI write your config</h2>
+            <h2>Config you can understand.</h2>
             <p class="body-copy">
-              On first run, Codewarper asks which provider you want to use,
-              then has that model interview you and generate a
-              <code style="font-family: 'IBM Plex Mono', monospace; font-size: 0.88rem; background: rgba(15,23,42,0.06); padding: 1px 5px; border-radius: 4px;">codewarper.js</code>
-              matched to your project. Edit the result, check it in, done.
+              Easy to get started. You can use a template or let AI write an initial 
+              <code style="font-family: 'IBM Plex Mono', monospace; font-size: 0.88rem; background: rgba(15,23,42,0.06); padding: 1px 5px; border-radius: 4px;">codewarper.js</code>.
+              for you.
             </p>
             <pre class="code-block">export default {
   tools: [ /* file ops, grep, web search, ... */ ],
@@ -355,26 +346,14 @@
 
           <div class="divider"></div>
 
-          <div class="subsection">
-            <h2>Custom slash commands</h2>
-            <p class="body-copy">
-              Define your own
-              <code style="font-family: 'IBM Plex Mono', monospace; font-size: 0.88rem; background: rgba(15,23,42,0.06); padding: 1px 5px; border-radius: 4px;">/commands</code>
-              in the config. Run tests, open your editor, trigger CI — anything
-              you can script, the agent can invoke.
-            </p>
-          </div>
-
-          <div class="divider"></div>
-
           <div class="get-started">
             <h2>Get started</h2>
             <p>
-              Install codewarper from npm.
+              Install it.
             </p>
             <div class="install-cmd">npm install -g codewarper</div>
             <p>
-              Run it.
+              Run it in any project.
             </p>
             <div class="install-cmd">codewarper</div>
             <div class="links-row">
