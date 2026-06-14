@@ -6,7 +6,7 @@
     <title>Codewarper</title>
     <meta
       name="description"
-      content="Codewarper is the coding agent you can standardize on."
+      content="Codewarper is the coding agent you can standardize on. One config file, zero dependencies, no telemetry."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -193,6 +193,19 @@
         line-height: 1.56;
       }
 
+      .code-block {
+        margin: 0;
+        padding: 16px 18px;
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.8rem;
+        line-height: 1.65;
+        overflow-x: auto;
+        color: #334155;
+      }
+
       .get-started {
         padding: 20px 24px;
         border-radius: var(--radius-md);
@@ -266,14 +279,13 @@
         <section class="main-card">
           <div class="hero-copy">
             <span class="eyebrow">Now available</span>
-            <h1>Codewarper is the coding agent you can standardize on.</h1>
+            <h1>Codewarper</h1>
             <p class="hero-subhead">
-              Tailored to your organization, not improvised by each user.
+              The coding agent you can standardize on.
             </p>
             <p class="body-copy">
-              Decide what tools it has and what they can do, then use one setup
-              across the organization. Configure it around your own environment
-              and security practices.
+              Most coding agents come with tools built in and hope you'll lock
+              them down. Codewarper does the opposite. It only can do what you explicitly configure.
             </p>
           </div>
 
@@ -288,19 +300,69 @@
             </p>
             <div class="list-grid">
               <div class="list-item">
-                <strong>Security choices</strong>
+                <strong>No tools by default</strong>
                 <p>
-                  Set the tools and limits to match your own environment and
-                  security practices.
+                  Ships with zero capabilities. File access, shell commands,
+                  network calls — nothing is available until you add it to the
+                  config.
                 </p>
               </div>
               <div class="list-item">
                 <strong>Zero dependencies</strong>
                 <p>
-                  A codebase you can actually review.
+                  No runtime packages. No supply chain to trust beyond Node.js
+                  itself.
+                </p>
+              </div>
+              <div class="list-item">
+                <strong>No telemetry</strong>
+                <p>
+                  Never phones home. No usage tracking, no crash reports. The
+                  only outbound connections are the provider APIs you configure.
+                </p>
+              </div>
+              <div class="list-item">
+                <strong>Auditable code</strong>
+                <p>
+                  Full source on GitHub. Review it, fork it, ship it internally.
                 </p>
               </div>
             </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="subsection">
+            <h2>Let the AI write your config</h2>
+            <p class="body-copy">
+              On first run, Codewarper asks which provider you want to use,
+              then has that model interview you and generate a
+              <code style="font-family: 'IBM Plex Mono', monospace; font-size: 0.88rem; background: rgba(15,23,42,0.06); padding: 1px 5px; border-radius: 4px;">codewarper.js</code>
+              matched to your project. Edit the result, check it in, done.
+            </p>
+            <pre class="code-block">export default {
+  tools: [ /* file ops, grep, web search, ... */ ],
+  commands: {
+    test: { description: "Run the test suite", async run() { /* ... */ } },
+  },
+  systemPrompt: "You are a concise coding assistant. ...",
+  hooks: {
+    onProviderRequest(req) { /* log it */ },
+    onProviderResponse(req, res) { /* audit it */ },
+  },
+}</pre>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="subsection">
+            <h2>Custom slash commands</h2>
+            <p class="body-copy">
+              Define your own
+              <code style="font-family: 'IBM Plex Mono', monospace; font-size: 0.88rem; background: rgba(15,23,42,0.06); padding: 1px 5px; border-radius: 4px;">/commands</code>
+              in the config. Run tests, open your editor, trigger CI — anything
+              you can script, the agent can invoke.
+            </p>
           </div>
 
           <div class="divider"></div>
