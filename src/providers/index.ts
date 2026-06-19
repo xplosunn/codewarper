@@ -12,6 +12,7 @@ import type {
 import { openaiCodexProvider } from "./openai-codex.ts";
 import { opencodeZenProvider } from "./opencode-zen.ts";
 import { openrouterProvider } from "./openrouter-free.ts";
+import { lmStudioProvider } from "./lmstudio.ts";
 import type { Tool } from "../tools/types.ts";
 
 export interface AvailableModel { id: string; name: string; }
@@ -67,7 +68,7 @@ export function createModelProviders(providers: readonly Provider[]): ModelProvi
 
 export class ModelProvidersService extends Context.Tag("codewarper/ModelProvidersService")<ModelProvidersService, ModelProviders>() {}
 
-export const builtInProviders: Provider[] = [openaiCodexProvider, opencodeZenProvider, openrouterProvider];
+export const builtInProviders: Provider[] = [openaiCodexProvider, opencodeZenProvider, openrouterProvider, lmStudioProvider];
 export const BuiltInModelProviders = createModelProviders(builtInProviders);
 export const providers = builtInProviders;
 
