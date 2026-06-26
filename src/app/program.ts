@@ -476,27 +476,76 @@ function runPrompt(app: App, text: string): Effect<App, never, PromptR> {
         { type: "user" as const, text },
       ],
     };
-    return yield* terminal.runWithStepAbortSignal((signal: AbortSignal) =>
-      Effect.gen(function* () {
-        const result = yield* Effect.either(
-          step(nextConversation, app.sessionConfiguration, signal),
-        );
-        if (result._tag === "Right") {
-          terminal.show({
-            type: "assistant",
-            text: result.right.newMessage.text,
-          });
-          return {
-            ...app,
-            conversation: result.right.conversation,
-          };
-        }
-        const message = result.left.message;
-        if (message !== "Interrupted.")
-          terminal.show({ type: "error", text: message });
-        return app;
-      }),
+
+    // Run the step inside the abort-signal scope so Ctrl+C aborts the step
+    const result = yield* terminal.runWithStepAbortSignal(
+      (signal: AbortSignal) => Effect.either(
+        step(nextConversation, app.sessionConfiguration, signal),
+      ),
     );
+
+    if (result._tag === "Right") {
+      terminal.show({
+        type: "assistant",
+        text: result.right.newMessage.text,
+      });
+      return {
+        ...app,
+        conversation: result.right.conversation,
+      };
+    }
+
+    if (result.left.message !== "Interrupted.") {
+      terminal.show({ type: "error", text: result.left.message });
+      return app;
+    }
+
+    // --- Ctrl+C: offer steering menu (outside abort scope, SIGINT back to normal) ---
+    terminal.show({ type: "separator" });
+
+    const choice = yield* Effect.either(
+      promptSelect(terminal, "The response was interrupted.", [
+        { label: "Discard - return to prompt", value: "discard" as const },
+        {
+          label: "Steer - redirect the conversation",
+          value: "steer" as const,
+        },
+      ]),
+    );
+
+    if (choice._tag === "Left" || choice.right === "discard") return app;
+
+    // Steer: ask for the new direction (empty input = cancel)
+    const steerText = yield* Effect.either(
+      promptText(terminal, "steer> ", { allowEmpty: true, signal: null }),
+    );
+
+    if (steerText._tag === "Left" || !steerText.right.trim()) return app;
+
+    // Append steering message to history and re-run
+    const steeredConversation = {
+      history: [
+        ...nextConversation.history,
+        { type: "user" as const, text: steerText.right },
+      ],
+    };
+
+    const steerResult = yield* terminal.runWithStepAbortSignal(
+      (signal: AbortSignal) => Effect.either(
+        step(steeredConversation, app.sessionConfiguration, signal),
+      ),
+    );
+
+    if (steerResult._tag === "Right") {
+      terminal.show({
+        type: "assistant",
+        text: steerResult.right.newMessage.text,
+      });
+      return { ...app, conversation: steerResult.right.conversation };
+    }
+    if (steerResult.left.message !== "Interrupted.")
+      terminal.show({ type: "error", text: steerResult.left.message });
+    return app;
   });
 }
 

@@ -95,7 +95,7 @@ function exitOnSigint(): void {
 }
 
 function abortOnSigint(controller: AbortController): void {
-  controller.abort();
+  controller.abort("Interrupted.");
   process.stdout.write("\n");
 }
 
