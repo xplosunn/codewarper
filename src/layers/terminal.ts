@@ -62,6 +62,10 @@ function renderPlainBlock(text: string): void {
   writeTextLines(text, writeLine, { indent: true });
 }
 
+function renderInfo(text: string): void {
+  writeTextLines(text, writeLine, { indent: false });
+}
+
 function renderBanner(title: string): void {
   renderSeparatedBlock(title, { indent: false });
 }
@@ -121,7 +125,19 @@ async function withSigintAbort<A>(rl: readline.Interface, run: (signal: AbortSig
   }
 }
 
+type KeypressHandler = (...args: unknown[]) => void;
+
+interface StepResource {
+  onData: ((chunk: Buffer) => void) | undefined;
+  keypressListeners: KeypressHandler[];
+  rlHandle: ReturnType<typeof acquireSigintAbort>;
+  decoder: InstanceType<typeof TextDecoder>;
+}
+
 export function createTerminal(rl: readline.Interface): Terminal {
+  // Lives beyond acquire/release — read by flushSilentInput after the step.
+  let silentInputBuffer = "";
+
   // Adding a listener here suppresses readline's default handler
   // (which would call rl.close() and permanently break the interface).
   // Scoped operations temporarily replace this listener with one that aborts
@@ -144,6 +160,9 @@ export function createTerminal(rl: readline.Interface): Terminal {
       case "banner":
         renderBanner(message.title);
         return;
+      case "info":
+        renderInfo(message.text);
+        return;
       case "system":
         renderSystem(message.text);
         return;
@@ -165,10 +184,79 @@ export function createTerminal(rl: readline.Interface): Terminal {
 
   const runWithStepAbortSignal: Terminal["runWithStepAbortSignal"] = (run) =>
     Effect.acquireUseRelease(
-      Effect.sync(() => acquireSigintAbort(rl)),
-      (handle) => run(handle.controller.signal),
-      (handle) => Effect.sync(() => releaseSigintAbort(rl, handle)),
+      Effect.sync((): StepResource => {
+        silentInputBuffer = "";
+
+        // Temporarily remove readline's keypress listeners from stdin
+        // so it stops processing input during step execution.
+        const keypressListeners = process.stdin.listeners("keypress") as KeypressHandler[];
+        for (const listener of keypressListeners) {
+          process.stdin.removeListener("keypress", listener);
+        }
+
+        // Swap readline's SIGINT handler to abort the step controller
+        const rlHandle = acquireSigintAbort(rl);
+
+        if (!process.stdin.isTTY) {
+          return { onData: undefined, keypressListeners, rlHandle, decoder: new TextDecoder() };
+        }
+
+        // Ensure raw mode so we receive every byte individually,
+        // including Ctrl+C as byte 0x03 instead of a SIGINT signal.
+        process.stdin.setRawMode(true);
+
+        const decoder = new TextDecoder();
+
+        // Own stdin during step execution:
+        // - 0x03 (Ctrl+C) → abort the step controller
+        // - everything else → silently buffer for later retrieval
+        const onData = (chunk: Buffer) => {
+          // Scan every byte so Ctrl+C is detected even if it arrives
+          // in the same chunk as preceding characters.
+          for (let i = 0; i < chunk.length; i++) {
+            if (chunk[i] === 0x03) {
+              // Buffer everything typed before the Ctrl+C
+              if (i > 0) {
+                silentInputBuffer += decoder.decode(chunk.subarray(0, i), { stream: true });
+              }
+              rlHandle.controller.abort("Interrupted.");
+              process.stdout.write("\n");
+              return;
+            }
+          }
+          // No Ctrl+C found, buffer the whole chunk
+          silentInputBuffer += decoder.decode(chunk, { stream: true });
+        };
+        process.stdin.on("data", onData);
+
+        return { onData, keypressListeners, rlHandle, decoder };
+      }),
+      (handle: StepResource) => run(handle.rlHandle.controller.signal),
+      (handle: StepResource) =>
+        Effect.sync(() => {
+          // Remove our data listener
+          if (handle.onData) {
+            process.stdin.removeListener("data", handle.onData);
+          }
+
+          // Restore readline's keypress listeners so prompts work again
+          for (const listener of handle.keypressListeners) {
+            process.stdin.on("keypress", listener);
+          }
+
+          // Restore readline's default SIGINT handler
+          releaseSigintAbort(rl, handle.rlHandle);
+
+          // Flush any remaining bytes from the streaming decoder
+          silentInputBuffer += handle.decoder.decode();
+        }),
     );
+
+  const flushSilentInput: Terminal["flushSilentInput"] = () => {
+    const value = silentInputBuffer;
+    silentInputBuffer = "";
+    return value;
+  };
 
   const promptText: Terminal["promptText"] = async (message, options) => {
     const allowEmpty = options.allowEmpty;
@@ -206,5 +294,5 @@ export function createTerminal(rl: readline.Interface): Terminal {
     return choice;
   };
 
-  return { show, showFatalError, runWithStepAbortSignal, promptText, promptSelect };
+  return { show, showFatalError, runWithStepAbortSignal, promptText, promptSelect, flushSilentInput };
 }

@@ -102,6 +102,17 @@ const loop = (
 ): Effect<void, Error, AppR> =>
   Effect.gen(function* () {
     terminal.show({ type: "separator" });
+
+    // Show any keystrokes typed silently during the previous step
+    // as an informational message, then always prompt.
+    const buffered = terminal.flushSilentInput();
+    if (buffered.trim()) {
+      terminal.show({
+        type: "info",
+        text: `[buffered: ${buffered.replace(/\n/g, "\\n")}]`,
+      });
+    }
+
     const rawInput = yield* promptText(terminal, "you> ", {
       allowEmpty: true,
       signal: null,

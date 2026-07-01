@@ -10,6 +10,7 @@ export type TerminalMessage =
   | { type: "blankLine" }
   | { type: "separator" }
   | { type: "banner"; title: string }
+  | { type: "info"; text: string }
   | { type: "system"; text: string }
   | { type: "assistant"; text: string }
   | { type: "error"; text: string }
@@ -21,6 +22,8 @@ export interface Terminal {
   runWithStepAbortSignal<A, E, R extends Record<string, unknown>>(run: (signal: AbortSignal) => Effect<A, E, R>): Effect<A, E, R>;
   promptText(message: string, options: PromptTextOptions): Promise<string>;
   promptSelect<T>(message: string, options: SelectOption<T>[]): Promise<T>;
+  /** Return any keystrokes typed during step execution (silent, no echo) and clear the buffer. */
+  flushSilentInput(): string;
 }
 
 export class TerminalService extends Context.Tag("codewarper/TerminalService")<TerminalService, Terminal>() {}

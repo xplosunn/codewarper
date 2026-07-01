@@ -60,6 +60,7 @@ const terminal: Terminal = {
   promptSelect: async () => {
     throw new Error("Interactive option selection is disabled in integration tests.");
   },
+  flushSilentInput: () => "",
 };
 
 const disabledOAuth: OAuth = {
