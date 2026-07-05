@@ -211,6 +211,53 @@ export default {
       },
     },
     {
+      name: "edit",
+      description:
+        "Apply text edits to a file. Takes a filePath and an edits array of {oldText, newText}. Each edit replaces all occurrences of oldText with newText. Path is relative to the working directory unless absolute.",
+      inputSchema: withWhy({
+        type: "object",
+        properties: {
+          filePath: { type: "string" },
+          edits: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                oldText: { type: "string" },
+                newText: { type: "string" },
+              },
+              required: ["oldText", "newText"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["filePath", "edits"],
+      }),
+      getCallStatusMessage(input) {
+        return `Editing file ${input.filePath} (${input.edits.length} edit${input.edits.length !== 1 ? "s" : ""}) — why: ${input.why}`;
+      },
+      async run(input) {
+        const filePath = resolveUnderCwd(input.filePath);
+        let content = await readFile(filePath, "utf8");
+        let totalReplacements = 0;
+
+        for (let i = 0; i < input.edits.length; i++) {
+          const { oldText, newText } = input.edits[i];
+
+          if (!content.includes(oldText)) {
+            return `Edit ${i + 1}/${input.edits.length} failed: oldText not found in the file.\noldText:\n${oldText}`;
+          }
+
+          const count = content.split(oldText).length - 1;
+          content = content.split(oldText).join(newText);
+          totalReplacements += count;
+        }
+
+        await writeFile(filePath, content, "utf8");
+        return `Applied ${totalReplacements} replacement${totalReplacements !== 1 ? "s" : ""} across ${input.edits.length} edit${input.edits.length !== 1 ? "s" : ""} to ${input.filePath}.`;
+      },
+    },
+    {
       name: "delete_file",
       description:
         "Delete a file. Path is relative to the working directory unless absolute.",
