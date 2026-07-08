@@ -9,7 +9,7 @@
  *   systemPrompt         — Custom system instructions for the AI
  *   tools                — Define tools the AI can invoke
  *   commands             — Register custom slash commands (/command_name)
- *   hooks                — Lifecycle hooks (onProviderRequest, onProviderResponse, …)
+ *   hooks                — Lifecycle hooks (onStartup, onProviderRequest, onProviderResponse, …)
  *
  * Tools and commands run with your local user permissions.
  * After editing this file, run /reload in codewarper to pick up changes.
@@ -291,19 +291,23 @@ export default {
   // =========================================================================
   // hooks  (optional — default: null)
   // =========================================================================
-  // Lifecycle hooks that fire at specific points during the provider request
-  // lifecycle. Add new hooks here as they become available.
+  // Lifecycle hooks that fire at specific points. Return void or a Promise<void>.
   hooks: {
+    // Called once during startup, after config is loaded and the provider
+    // session is established. Use it to log into remote environments, set up
+    // tunnels, export environment variables, etc.
+    async onStartup() {
+      console.log("Startup hook: ready.");
+    },
+
     // Called before every request to the LLM provider.  Use it for logging,
     // rate-limiting, auditing, or modifying the outgoing fetch Request.
-    // Return void or a Promise<void>.
     onProviderRequest(request) {
       console.log(`[Provider Request] ${request.method} ${request.url}`);
     },
 
     // Called after every response from the LLM provider.  Use it for logging,
     // usage tracking, or inspecting the Response.
-    // Return void or a Promise<void>.
     onProviderResponse(request, response) {
       console.log(`[Provider Response] ${response.status} ${response.statusText}`);
     },

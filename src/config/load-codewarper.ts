@@ -20,10 +20,12 @@ export type CodewarperCommand = {
 
 export type ProviderRequestCallback = (request: Request) => Promise<void> | void;
 export type ProviderResponseCallback = (request: Request, response: Response) => Promise<void> | void;
+export type StartupCallback = () => Promise<void> | void;
 
 export interface CodewarperHooks {
   onProviderRequest: ProviderRequestCallback | null;
   onProviderResponse: ProviderResponseCallback | null;
+  onStartup: StartupCallback | null;
 }
 
 export interface CodewarperConfig {
@@ -83,12 +85,20 @@ function validateHooks(raw: unknown): CodewarperHooks | null {
     throw new Error("Codewarper config hooks.onProviderResponse must be a function when provided.");
   }
 
+  const onStartupUnknown = hooks.onStartup;
+  if (typeof onStartupUnknown !== "undefined" && typeof onStartupUnknown !== "function") {
+    throw new Error("Codewarper config hooks.onStartup must be a function when provided.");
+  }
+
   return {
     onProviderRequest: typeof onProviderRequestUnknown === "function"
       ? onProviderRequestUnknown as ProviderRequestCallback
       : null,
     onProviderResponse: typeof onProviderResponseUnknown === "function"
       ? onProviderResponseUnknown as ProviderResponseCallback
+      : null,
+    onStartup: typeof onStartupUnknown === "function"
+      ? onStartupUnknown as StartupCallback
       : null,
   };
 }

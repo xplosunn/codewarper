@@ -36,6 +36,7 @@ test("createHttpClient passes cloned request and response to provider hooks", as
   const http = createHttpClient(
     configLoader({
       hooks: {
+        onStartup: null,
         async onProviderRequest(request) {
           requestUrl = request.url;
           requestBody = await request.text();
@@ -77,6 +78,7 @@ test("createHttpClient taps streaming response without consuming returned respon
   const http = createHttpClient(
     configLoader({
       hooks: {
+        onStartup: null,
         onProviderRequest: null,
         async onProviderResponse(_request, response) {
           hookedResponseBody = await response.text();

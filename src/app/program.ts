@@ -288,6 +288,16 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
       .join("\n"),
   });
 
+  // Run the user's onStartup hook (e.g. login to a remote environment).
+  const hooks = loadedConfig.hooks;
+  if (hooks?.onStartup) {
+    yield* Effect.tryPromise({
+      try: () => hooks.onStartup!(),
+      catch: toError,
+    });
+    terminal.show({ type: "system", text: "Startup hook completed." });
+  }
+
   return {
     sessionConfiguration,
     conversation: { history: [] },
