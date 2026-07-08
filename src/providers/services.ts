@@ -14,7 +14,8 @@ export type TerminalMessage =
   | { type: "system"; text: string }
   | { type: "assistant"; text: string }
   | { type: "error"; text: string }
-  | { type: "status"; status: TerminalStatus };
+  | { type: "status"; status: TerminalStatus }
+  | { type: "timeInfo"; text: string };
 
 export interface Terminal {
   show(message: TerminalMessage): void;

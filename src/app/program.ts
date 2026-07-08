@@ -499,17 +499,20 @@ function runPrompt(app: App, text: string): Effect<App, never, PromptR> {
     };
 
     // Run the step inside the abort-signal scope so Ctrl+C aborts the step
+    const startedAt = Date.now();
     const result = yield* terminal.runWithStepAbortSignal(
       (signal: AbortSignal) => Effect.either(
         step(nextConversation, app.sessionConfiguration, signal),
       ),
     );
+    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
 
     if (result._tag === "Right") {
       terminal.show({
         type: "assistant",
         text: result.right.newMessage.text,
       });
+      terminal.show({ type: "timeInfo", text: `⏱️ ${elapsed}s` });
       return {
         ...app,
         conversation: result.right.conversation,

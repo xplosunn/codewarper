@@ -39,23 +39,34 @@ function renderBlankLine(writer: LineWriter = writeLine): void {
   writer("");
 }
 
-function renderSeparator(writer: LineWriter = writeLine): void {
-  renderBlankLine(writer);
+function renderSeparator(
+  writer: LineWriter = writeLine,
+  options: { leadingBlank?: boolean; trailingBlank?: boolean } = {},
+): void {
+  const leadingBlank = options.leadingBlank ?? true;
+  const trailingBlank = options.trailingBlank ?? true;
+  if (leadingBlank) renderBlankLine(writer);
   writer(separatorLine());
-  renderBlankLine(writer);
+  if (trailingBlank) renderBlankLine(writer);
+}
+
+function renderTimeInfo(text: string, writer: LineWriter = writeLine): void {
+  writeTextLines(text, writer, { indent: true });
+  renderSeparator(writer, { leadingBlank: false, trailingBlank: true });
 }
 
 function renderSeparatedBlock(
   text: string,
-  options: { title?: string; indent?: boolean; writer?: LineWriter } = {},
+  options: { title?: string; indent?: boolean; writer?: LineWriter; closeSeparatorBlank?: boolean } = {},
 ): void {
   const writer = options.writer ?? writeLine;
   const indent = options.indent ?? true;
+  const closeTrailingBlank = options.closeSeparatorBlank ?? true;
 
   renderSeparator(writer);
   if (options.title !== undefined) writer(options.title);
   writeTextLines(text, writer, { indent });
-  renderSeparator(writer);
+  renderSeparator(writer, { trailingBlank: closeTrailingBlank });
 }
 
 function renderPlainBlock(text: string): void {
@@ -75,7 +86,7 @@ function renderSystem(text: string): void {
 }
 
 function renderAssistant(text: string): void {
-  renderSeparatedBlock(text);
+  renderSeparatedBlock(text, { closeSeparatorBlank: false });
 }
 
 function renderError(text: string): void {
@@ -149,7 +160,14 @@ export function createTerminal(rl: readline.Interface): Terminal {
     try { rl.close(); } catch {}
   });
 
+  let lastMessageWasTimeInfo = false;
+
   const show: Terminal["show"] = (message) => {
+    if (message.type === "separator" && lastMessageWasTimeInfo) {
+      lastMessageWasTimeInfo = false;
+      return;
+    }
+    lastMessageWasTimeInfo = false;
     switch (message.type) {
       case "blankLine":
         renderBlankLine();
@@ -174,6 +192,10 @@ export function createTerminal(rl: readline.Interface): Terminal {
         return;
       case "status":
         renderStatus(message.status);
+        return;
+      case "timeInfo":
+        renderTimeInfo(message.text);
+        lastMessageWasTimeInfo = true;
         return;
     }
   };
