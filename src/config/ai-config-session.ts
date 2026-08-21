@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { DEFAULT_CONFIG_FILENAME } from "./load-codewarper.ts";
@@ -17,6 +17,48 @@ function resolveWorkspacePath(inputPath: string): string {
 // ---------------------------------------------------------------------------
 // Tools for the AI config session
 // ---------------------------------------------------------------------------
+
+async function listDirRecursive(dir: string, base = dir): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const names: string[] = [];
+  for (const entry of entries) {
+    if (entry.name === "node_modules" || entry.name === ".git") continue;
+    const entryPath = path.join(dir, entry.name);
+    names.push(path.relative(base, entryPath) || entry.name);
+    if (entry.isDirectory()) {
+      names.push(...(await listDirRecursive(entryPath, base)));
+    }
+  }
+  return names;
+}
+
+const listDirTool: Tool = {
+  name: "list_dir",
+  description:
+    'List file and directory names in a directory. Defaults to "." when omitted. Set recursive to true to include nested entries (skips node_modules and .git).',
+  inputSchema: {
+    type: "object",
+    properties: {
+      dirPath: { type: "string" },
+      recursive: { type: "boolean" },
+      why: { type: "string" },
+    },
+    required: ["why"],
+    additionalProperties: false,
+  },
+  getCallStatusMessage(input: unknown) {
+    const i = input as { dirPath?: string; recursive?: boolean; why: string };
+    return `Listing directory ${i.dirPath ?? "."}${i.recursive ? " recursively" : ""} — why: ${i.why}`;
+  },
+  async run(input: unknown) {
+    const i = input as { dirPath?: string; recursive?: boolean };
+    const dirPath = resolveWorkspacePath(i.dirPath ?? ".");
+    if (i.recursive) {
+      return (await listDirRecursive(dirPath)).join("\n");
+    }
+    return (await readdir(dirPath)).join("\n");
+  },
+};
 
 const readFileTool: Tool = {
   name: "read_file",
@@ -73,7 +115,7 @@ const writeConfigTool: Tool = {
   },
 };
 
-const AI_CONFIG_TOOLS: Tool[] = [readFileTool, writeConfigTool];
+const AI_CONFIG_TOOLS: Tool[] = [listDirTool, readFileTool, writeConfigTool];
 
 export function createAiConfigSessionTools(): LoadedTool[] {
   return loadToolsWithValidators(AI_CONFIG_TOOLS);
@@ -81,11 +123,11 @@ export function createAiConfigSessionTools(): LoadedTool[] {
 
 export const AI_CONFIG_SYSTEM_PROMPT = [
   "You are configuring Codewarper for this project.",
-  `You have two tools: read_file (read any file in the workspace) and write_file (write only ${DEFAULT_CONFIG_FILENAME}).`,
+  `You have three tools: list_dir (list files, supports recursive), read_file (read any file in the workspace), and write_file (write only ${DEFAULT_CONFIG_FILENAME}).`,
   "",
   "WORKFLOW:",
-  `1. Read package.json (or equivalent project manifest) and the current ${DEFAULT_CONFIG_FILENAME} to understand the project and config format.`,
-  "2. Read additional files as needed: linter configs, test setup, build scripts, CI config, etc.",
+  `1. List the project root with list_dir, then read package.json (or equivalent project manifest) and the current ${DEFAULT_CONFIG_FILENAME} to understand the project and config format.`,
+  "2. Read additional files as needed: linter configs, test setup, build scripts, CI config, etc. Use list_dir with recursive to discover files instead of guessing paths.",
   `3. Write an improved ${DEFAULT_CONFIG_FILENAME} that adds project-specific tools: build, test, lint, typecheck, etc.`,
   "",
   "RULES:",
@@ -105,6 +147,6 @@ export const AI_CONFIG_USER_PROMPT = [
   "- Linting / formatting",
   "- Any other project-specific workflows",
   "",
-  `Start by reading the current ${DEFAULT_CONFIG_FILENAME} and package.json (or equivalent).`,
+  `Start by listing the project root with list_dir, then read the current ${DEFAULT_CONFIG_FILENAME} and package.json (or equivalent).`,
   "Then explore further and write the improved config.",
 ].join("\n");
