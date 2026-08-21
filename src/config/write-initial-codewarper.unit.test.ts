@@ -17,7 +17,7 @@ const expectedToolCounts: Record<InitialCodewarperStarter, number> = {
   local_files: 4,
   local_files_with_websearch: 5,
   all_config_options: 6,
-  recommended_for_codewarper: 9,
+  recommended_for_codewarper: 10,
 };
 
 interface StarterExpectations {
@@ -63,7 +63,7 @@ const starterExpectations: Record<InitialCodewarperStarter, StarterExpectations>
     onProviderResponseNull: false,
   },
   recommended_for_codewarper: {
-    toolCount: 9,
+    toolCount: 10,
     commandsEmpty: false,
     systemPromptNull: false,
     hooksNull: true,

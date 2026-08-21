@@ -19,4 +19,5 @@ export interface CodewarperConfig {
   tools?: Tool[];
   commands?: Record<string, Command>;
   systemPrompt?: string;
+  skillDirectories?: string[];
 }

@@ -32,6 +32,8 @@
     "start": "node --experimental-strip-types --conditions=development src/main.ts",
     "check": "tsc --noEmit && node --experimental-strip-types --conditions=development --check src/main.ts && node --experimental-strip-types --conditions=development -e \"import('./src/app/program.ts')\" && echo '\nCheck completed successfully!'",
     "test": "pnpm run check && node --experimental-strip-types --conditions=development --test \"src/**/*.unit.test.ts\" \"libs/**/*.unit.test.ts\"",
-    "test:integration": "node --experimental-strip-types --conditions=development --test test/**/*.integration.test.ts"
+    "test:integration": "pnpm run test:integration:providers",
+    "test:integration:providers": "node --experimental-strip-types --conditions=development --test test/providers.integration.test.ts",
+    "test:integration:skills": "node --experimental-strip-types --conditions=development --test test/skills.integration.test.ts"
   }
 }

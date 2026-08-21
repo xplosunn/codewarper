@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { Effect, Layer, type Req } from "#effect";
-import type { CodewarperConfig, CodewarperConfigLoader } from "../src/config/load-codewarper.ts";
 import { createAuthStore } from "../src/persistence/auth-store.ts";
-import { providers, type Provider, type ProviderOption, type ProviderSelection } from "../src/providers/index.ts";
+import {
+  providers,
+  type Message,
+  type Provider,
+  type ProviderOption,
+  type ProviderSelection,
+} from "../src/providers/index.ts";
 import {
   ClockService,
   CryptoService,
@@ -20,11 +28,18 @@ import { createClock, createSystemInfo } from "../src/layers/platform.ts";
 import { createCrypto } from "../src/layers/crypto-impl.ts";
 import { createHttpClient } from "../src/layers/http-client.ts";
 import { createPersistenceRuntime } from "../src/layers/persistence-runtime.ts";
+import { step } from "../src/step/index.ts";
+import type { SessionConfiguration } from "../src/step/index.ts";
+import { loadSkillsFromDirectories } from "../src/skills/load-skills.ts";
+import { createSkillTools } from "../src/skills/skill-tools.ts";
+import { appendSkillGuidanceToSystemPrompt } from "../src/skills/skill-system-prompt.ts";
+import { appendToolGuidanceToSystemPrompt } from "../src/tools/tool-system-prompt.ts";
+import type { CodewarperConfig, CodewarperConfigLoader } from "../src/config/load-codewarper.ts";
 
-const PROMPT = "Reply exactly: OK";
-const SYSTEM_PROMPT = "Return only the exact text requested by the user.";
-const PROVIDER_TIMEOUT_MS = 120_000;
 const TEST_PROVIDER = process.env.TEST_PROVIDER?.trim();
+const PROVIDER_TIMEOUT_MS = 120_000;
+
+const BASE_SYSTEM_PROMPT = "You are Codewarper running an integration test.";
 
 const emptyConfig: CodewarperConfig = {
   tools: [],
@@ -84,52 +99,64 @@ const IntegrationLive = Layer.mergeAll(
   Layer.succeed(ProviderAuthStoreService, createAuthStore<ProviderAuth>(createPersistenceRuntime())),
 );
 
-test("all providers reply with OK for every advertised option combination", async (t) => {
-  assert.notEqual(providers.length, 0, "Expected at least one provider to be registered.");
+test("real provider can load and use a configured skill", { timeout: PROVIDER_TIMEOUT_MS }, async (t) => {
+  const selectedProviders = selectTestProviders(providers);
+  assert.notEqual(selectedProviders.length, 0, `No provider name matched TEST_PROVIDER=${JSON.stringify(TEST_PROVIDER)}.`);
 
-  const testProviders = selectTestProviders(providers);
-  assert.notEqual(
-    testProviders.length,
-    0,
-    `No provider name matched TEST_PROVIDER=${JSON.stringify(TEST_PROVIDER)}.`,
-  );
+  const provider = selectedProviders[Math.floor(Math.random() * selectedProviders.length)]!;
+  t.diagnostic(`Selected provider: ${provider.name}`);
 
-  if (TEST_PROVIDER) {
-    t.diagnostic(`TEST_PROVIDER=${JSON.stringify(TEST_PROVIDER)} matched: ${testProviders.map((provider) => provider.name).join(", ")}`);
-  }
+  const tmpRoot = tmpdir();
+  await mkdir(tmpRoot, { recursive: true });
+  const dir = await mkdtemp(path.join(tmpRoot, "codewarper-skill-integration-"));
+  try {
+    const skillsDir = path.join(dir, "skills", "nested");
+    await mkdir(skillsDir, { recursive: true });
 
-  for (const provider of testProviders) {
-    await t.test(provider.name, async (t) => {
-      const auth = await run(provider.ensureAuthenticated(false));
-      const options = await run(provider.listOptions(auth));
-      const selections = createSelections(provider.id, options);
+    const nonce = `CW_SKILL_TEST_${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}_OK`;
+    await writeFile(path.join(skillsDir, "nonce-reply.md"), [
+      "---",
+      "name: nonce-reply",
+      "description: Use only when the user asks for the Codewarper skill integration nonce reply. This skill defines the required nonce response for integration testing.",
+      "---",
+      "# Nonce Reply Skill",
+      "",
+      "When this skill is used, reply with exactly this text and nothing else:",
+      "",
+      nonce,
+      "",
+    ].join("\n"));
 
-      t.diagnostic(`Testing ${selections.length} option combination(s).`);
+    const skills = await loadSkillsFromDirectories([path.join(dir, "skills")]);
+    const loadedTools = createSkillTools(skills);
+    const systemPrompt = appendToolGuidanceToSystemPrompt(
+      appendSkillGuidanceToSystemPrompt(BASE_SYSTEM_PROMPT, skills),
+      loadedTools,
+    );
 
-      for (const selection of selections) {
-        await t.test(formatSelectionName(selection, options), { timeout: PROVIDER_TIMEOUT_MS }, async () => {
-          const completion = await run(
-            provider.complete(
-              auth,
-              selection,
-              [{ type: "user", text: PROMPT }],
-              SYSTEM_PROMPT,
-              [],
-            ),
-          );
+    const auth = await run(provider.ensureAuthenticated(false));
+    const options = await run(provider.listOptions(auth));
+    const selection = firstSelection(provider.id, options);
 
-          assert.deepEqual(
-            completion.toolCalls,
-            [],
-            "Provider returned tool calls even though no tools were supplied.",
-          );
-          assert.ok(
-            completion.text.trim().includes("OK"),
-            `Expected provider response to contain "OK". Raw response: ${JSON.stringify(completion.text)}`,
-          );
-        });
-      }
-    });
+    const sessionConfiguration: SessionConfiguration = {
+      provider,
+      auth,
+      selection,
+      systemPrompt,
+      loadedTools,
+    };
+
+    const prompt = "Please perform the Codewarper skill integration nonce reply task.";
+
+    const result = await run(
+      step({ history: [{ type: "user", text: prompt }] }, sessionConfiguration),
+    );
+
+    assert.equal(result.newMessage.text.trim(), nonce);
+    assert.ok(hasReadSkillToolCall(result.conversation.history), "Expected provider to call read_skill.");
+    assert.ok(hasSkillToolResult(result.conversation.history, nonce), "Expected read_skill tool result to include nonce.");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
 
@@ -144,13 +171,12 @@ function run<A, E>(effect: Effect<A, E, IntegrationRequirements>): Promise<A> {
   return Effect.runPromise(Effect.provide(effect, IntegrationLive));
 }
 
-/**
- * Generate selections by walking the option tree per model:
- * - The "model" option's choices each produce a set of combinations with
- *   their sub-options. Choices without sub-options produce a single combo.
- * - Sibling non-model options (not expected in current providers)
- *   are treated as flat dimensions crossed with model combos.
- */
+function firstSelection(providerId: string, options: ProviderOption[]): ProviderSelection {
+  const selections = createSelections(providerId, options);
+  assert.notEqual(selections.length, 0, `Provider ${providerId} advertised no selectable option combinations.`);
+  return selections[0]!;
+}
+
 function createSelections(providerId: string, options: ProviderOption[]): ProviderSelection[] {
   for (const option of options) {
     assert.notEqual(
@@ -160,17 +186,13 @@ function createSelections(providerId: string, options: ProviderOption[]): Provid
     );
   }
 
-  // Separate model-level options (those with choices that may have sub-options)
-  // from flat options.
   const modelOptions = options.filter((o) => o.choices.some((c) => c.options));
   const flatOptions = options.filter((o) => o.choices.every((c) => !c.options));
 
-  // Generate combinations for model options — each model choice plus its sub-option combos.
   const modelCombos = modelOptions.flatMap((option) =>
     option.choices.flatMap((choice) => {
       const base = { [option.id]: choice.id };
       if (!choice.options) return [base];
-      // Cartesian product of sub-option choices.
       const subCombos = cartesianProduct(
         choice.options.map((sub) => sub.choices.map((c) => c.id)),
       );
@@ -181,12 +203,10 @@ function createSelections(providerId: string, options: ProviderOption[]): Provid
     }),
   );
 
-  // Cross with flat option combinations.
   const flatCombos = flatOptions.length > 0
     ? cartesianProduct(flatOptions.map((o) => o.choices.map((c) => c.id)))
     : [[]];
 
-  // If there are no model options, just use flat combos.
   if (modelCombos.length === 0) {
     return flatCombos.map((values) => ({
       providerId,
@@ -194,7 +214,6 @@ function createSelections(providerId: string, options: ProviderOption[]): Provid
     }));
   }
 
-  // Cross model combos with flat combos.
   return modelCombos.flatMap((modelPart) =>
     flatCombos.map((flatValues) => ({
       providerId,
@@ -215,18 +234,28 @@ function cartesianProduct<T>(dimensions: T[][]): T[][] {
   );
 }
 
-function formatSelectionName(selection: ProviderSelection, options: ProviderOption[]): string {
-  const entries: string[] = [];
-  for (const option of options) {
-    entries.push(`${option.id}=${selection.options[option.id] ?? ""}`);
-    // Also include sub-option values.
-    for (const choice of option.choices) {
-      if (choice.options && choice.id === selection.options[option.id]) {
-        for (const sub of choice.options) {
-          entries.push(`${sub.id}=${selection.options[sub.id] ?? ""}`);
-        }
-      }
-    }
-  }
-  return entries.length === 0 ? "default options" : entries.join(", ");
+function hasReadSkillToolCall(history: Message[]): boolean {
+  return history.some((message) =>
+    message.type === "model" &&
+    message.toolCalls?.some((call) =>
+      call.name === "read_skill" && readToolCallName(call.input) === "nonce-reply",
+    ),
+  );
+}
+
+function readToolCallName(input: unknown): unknown {
+  if (!isObjectRecord(input)) return undefined;
+  return input.name;
+}
+
+function isObjectRecord(input: unknown): input is Readonly<Record<string, unknown>> {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
+function hasSkillToolResult(history: Message[], nonce: string): boolean {
+  return history.some((message) =>
+    message.type === "tool_result" &&
+    message.toolName === "read_skill" &&
+    message.content.includes(nonce),
+  );
 }

@@ -13,6 +13,8 @@ function configLoader(config: Partial<CodewarperConfig>): CodewarperConfigLoader
     commands: [],
     systemPrompt: null,
     hooks: null,
+    skills: [],
+    skillDirectories: [],
     ...config,
   };
   return {

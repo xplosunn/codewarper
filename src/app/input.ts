@@ -9,6 +9,13 @@ export function parseUserInput(rawInput: string): UserInput {
   if (text === "/login") return { type: "login" };
   if (text === "/reload") return { type: "reload" };
   if (text === "/help") return { type: "help" };
+  if (text.startsWith("/skill ")) {
+    const parts = text.slice("/skill ".length).split(/\s+/).filter((part) => part.length > 0);
+    const [name, ...args] = parts;
+    if (name) return { type: "skill_command", name, args };
+    return { type: "unknown_command", command: text };
+  }
+  if (text === "/skill") return { type: "unknown_command", command: text };
   if (text.startsWith("/")) {
     const parts = text
       .slice(1)

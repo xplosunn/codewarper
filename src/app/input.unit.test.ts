@@ -28,6 +28,20 @@ test("/init is no longer a built-in command", () => {
   });
 });
 
+test("parseUserInput parses skill commands and args", () => {
+  assert.deepEqual(parseUserInput("/skill code-review"), {
+    type: "skill_command",
+    name: "code-review",
+    args: [],
+  });
+
+  assert.deepEqual(parseUserInput("/skill code-review staged diff"), {
+    type: "skill_command",
+    name: "code-review",
+    args: ["staged", "diff"],
+  });
+});
+
 test("parseUserInput parses custom commands and args", () => {
   assert.deepEqual(parseUserInput("/review src/main.ts --fix"), {
     type: "custom_command",

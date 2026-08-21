@@ -40,6 +40,9 @@ import type { SessionConfiguration } from "../step/index.ts";
 import type { StepR } from "../step/services.ts";
 import type { LoadedTool } from "../tools/loaded-tool.ts";
 import { appendToolGuidanceToSystemPrompt } from "../tools/tool-system-prompt.ts";
+import { appendSkillGuidanceToSystemPrompt } from "../skills/skill-system-prompt.ts";
+import { createSkillTools, READ_SKILL_TOOL_NAME } from "../skills/skill-tools.ts";
+import type { CodewarperSkill } from "../skills/types.ts";
 import { parseUserInput } from "./input.ts";
 import type { App, LoopResult, UserInput } from "./types.ts";
 import { bannerContent } from "./banner-content.ts";
@@ -58,6 +61,7 @@ const BUILT_IN_COMMANDS_HELP = [
   "/model",
   "/login",
   "/reload",
+  "/skill <name>",
 ];
 const AUTH_STATUS_KEY = "codewarperAuthStatus";
 
@@ -254,8 +258,9 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
     }
   }
 
-  const loadedTools = loadedConfig.tools;
+  const loadedTools = withSkillTools(loadedConfig.tools, loadedConfig.skills);
   const commands = loadedConfig.commands;
+  const skills = loadedConfig.skills;
   const baseSystemPrompt = loadedConfig.systemPrompt ?? SYSTEM_PROMPT;
 
   const savedSelection = preferences.getProviderSelection();
@@ -268,9 +273,10 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
     provider: selection.provider,
     auth: selection.auth,
     selection: selection.selection,
-    systemPrompt: appendToolGuidanceToSystemPrompt(
+    systemPrompt: buildSessionSystemPrompt(
       baseSystemPrompt,
       loadedTools,
+      skills,
     ),
     loadedTools,
   };
@@ -279,7 +285,7 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
     type: "system",
     text: [
       authStatusFromAuth(sessionConfiguration.auth),
-      `Loaded ${loadedTools.length} tool(s) and ${commands.length} command(s) from ${configOrigin}.`,
+      `Loaded ${loadedTools.length} tool(s), ${commands.length} command(s), and ${skills.length} skill(s) from ${configOrigin}.`,
       `Provider: ${sessionConfiguration.provider.name}`,
       `Options: ${formatSelectionOptions(sessionConfiguration.selection)}`,
       `Commands: ${formatCommandsHelp(commands)}`,
@@ -302,23 +308,45 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
     sessionConfiguration,
     conversation: { history: [] },
     commands,
+    skills,
   };
 });
 
-function sessionWithReloadedTools(
+function sessionWithReloadedConfig(
   session: SessionConfiguration,
   loadedTools: LoadedTool[],
+  skills: CodewarperSkill[],
   systemPromptOverride: string | null,
 ): SessionConfiguration {
   const baseSystemPrompt = systemPromptOverride ?? SYSTEM_PROMPT;
   return {
     ...session,
     loadedTools,
-    systemPrompt: appendToolGuidanceToSystemPrompt(
+    systemPrompt: buildSessionSystemPrompt(
       baseSystemPrompt,
       loadedTools,
+      skills,
     ),
   };
+}
+
+function withSkillTools(loadedTools: LoadedTool[], skills: CodewarperSkill[]): LoadedTool[] {
+  const skillTools = createSkillTools(skills);
+  if (skillTools.length > 0 && loadedTools.some((loaded) => loaded.tool.name === READ_SKILL_TOOL_NAME)) {
+    throw new Error(`Tool name "${READ_SKILL_TOOL_NAME}" is reserved for Codewarper skills.`);
+  }
+  return [...loadedTools, ...skillTools];
+}
+
+function buildSessionSystemPrompt(
+  baseSystemPrompt: string,
+  loadedTools: readonly LoadedTool[],
+  skills: readonly CodewarperSkill[],
+): string {
+  return appendToolGuidanceToSystemPrompt(
+    appendSkillGuidanceToSystemPrompt(baseSystemPrompt, skills),
+    loadedTools,
+  );
 }
 
 function refreshToolsFromDisk(app: App): Effect<App, never, AppR> {
@@ -334,18 +362,21 @@ function refreshToolsFromDisk(app: App): Effect<App, never, AppR> {
       });
       return app;
     }
-    const loadedTools = result.right.tools;
+    const loadedTools = withSkillTools(result.right.tools, result.right.skills);
     const commands = result.right.commands;
+    const skills = result.right.skills;
     terminal.show({
       type: "system",
-      text: `Reloaded ${loadedTools.length} tool(s) and ${commands.length} command(s) from ${configPath}.`,
+      text: `Reloaded ${loadedTools.length} tool(s), ${commands.length} command(s), and ${skills.length} skill(s) from ${configPath}.`,
     });
     return {
       ...app,
       commands,
-      sessionConfiguration: sessionWithReloadedTools(
+      skills,
+      sessionConfiguration: sessionWithReloadedConfig(
         app.sessionConfiguration,
         loadedTools,
+        skills,
         result.right.systemPrompt,
       ),
     };
@@ -429,7 +460,8 @@ function handleUserInput(
             "  /exit   Exit the app",
             "  /model  Switch provider options",
             "  /login  Switch provider; picking the current provider forces re-login",
-            "  /reload Reload tools and commands from the configured Codewarper config",
+            "  /reload Reload tools, commands, and skills from the configured Codewarper config",
+            "  /skill <name> [args...] Load a skill by name and run it with optional arguments",
             ...app.commands.map(
               (command) => `  /${command.name} ${command.description}`,
             ),
@@ -440,6 +472,8 @@ function handleUserInput(
         });
         return { type: "continue" as const, app };
       });
+    case "skill_command":
+      return runSkillCommand(app, userInput.name, userInput.args);
     case "custom_command":
       return runCustomCommand(app, userInput.name, userInput.args);
     case "unknown_command":
@@ -457,6 +491,35 @@ function handleUserInput(
         (nextApp) => ({ type: "continue", app: nextApp }),
       );
   }
+}
+
+function runSkillCommand(
+  app: App,
+  name: string,
+  args: string[],
+): Effect<LoopResult, Error, AppR> {
+  const skill = app.skills.find((candidate) => candidate.name === name);
+  if (!skill) {
+    return Effect.gen(function* () {
+      const terminal = yield* TerminalService;
+      terminal.show({ type: "system", text: `Unknown skill: ${name}` });
+      return { type: "continue" as const, app };
+    });
+  }
+
+  const prompt = [
+    `Use the ${skill.name} skill.`,
+    "",
+    `Skill file: ${skill.filePath}`,
+    "",
+    skill.content,
+    ...(args.length > 0 ? ["", "User arguments:", args.join(" ")] : []),
+  ].join("\n");
+
+  return Effect.map(
+    runPrompt(app, prompt),
+    (nextApp) => ({ type: "continue" as const, app: nextApp }),
+  );
 }
 
 function runCustomCommand(

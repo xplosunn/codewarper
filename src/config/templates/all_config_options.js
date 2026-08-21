@@ -9,6 +9,7 @@
  *   systemPrompt         — Custom system instructions for the AI
  *   tools                — Define tools the AI can invoke
  *   commands             — Register custom slash commands (/command_name)
+ *   skillDirectories     — Load markdown skills from explicit directories
  *   hooks                — Lifecycle hooks (onStartup, onProviderRequest, onProviderResponse, …)
  *
  * Tools and commands run with your local user permissions.
@@ -264,6 +265,21 @@ export default {
         return result ?? "No search results found. Please try a different query.";
       },
     },
+  ],
+
+  // =========================================================================
+  // skillDirectories  (optional — default: [])
+  // =========================================================================
+  // Directories are scanned recursively for .md files. Each skill markdown file
+  // must start with YAML frontmatter including at least a description. The file
+  // name is used as the skill name unless frontmatter.name is provided.
+  // Use /skill <name> to invoke a skill manually. Codewarper also advertises
+  // configured skills to the model so it can load them when relevant.
+  // No skill directories are loaded by default.
+  skillDirectories: [
+    // ".agents/skills",
+    // "~/.claude/skills",
+    // "~/.codex/skills",
   ],
 
   // =========================================================================

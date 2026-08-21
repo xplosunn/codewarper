@@ -5,6 +5,9 @@ import { pathToFileURL } from "node:url";
 import { Context, Effect } from "#effect";
 import type { Environment } from "../providers/services.ts";
 import { loadToolsWithValidators, type LoadedTool } from "../tools/loaded-tool.ts";
+import { loadSkillsFromDirectories } from "../skills/load-skills.ts";
+import { READ_SKILL_TOOL_NAME } from "../skills/skill-tools.ts";
+import type { CodewarperSkill } from "../skills/types.ts";
 import { isJsonValue } from "../tools/json-value.ts";
 import type { Tool } from "../tools/types.ts";
 
@@ -33,6 +36,8 @@ export interface CodewarperConfig {
   commands: CodewarperCommand[];
   systemPrompt: string | null;
   hooks: CodewarperHooks | null;
+  skills: CodewarperSkill[];
+  skillDirectories: string[];
 }
 
 export interface CodewarperConfigLoader {
@@ -114,13 +119,36 @@ export function loadCodewarperConfigFromPath(filePath: string): Effect<Codewarpe
 
       const url = cacheBustedFileUrl(filePath);
       const mod = (await import(url)) as { default?: unknown };
-      return parseConfigModule(mod, filePath);
+      return await parseConfigModuleAsync(mod, filePath);
     },
     catch: (e) => (e instanceof Error ? e : new Error(String(e))),
   });
 }
 
+type ParsedConfigModule = {
+  tools: Tool[];
+  commands: CodewarperCommand[];
+  systemPrompt: string | null;
+  hooks: CodewarperHooks | null;
+  skillDirectories: string[];
+};
+
+export async function parseConfigModuleAsync(mod: { default?: unknown }, label: string): Promise<CodewarperConfig> {
+  const parsed = parseConfigModuleMetadata(mod, label);
+  const skills = await loadSkillsFromDirectories(parsed.skillDirectories);
+  validateReservedSkillToolName(parsed.tools, skills);
+  return buildCodewarperConfig(parsed, skills);
+}
+
 export function parseConfigModule(mod: { default?: unknown }, label: string): CodewarperConfig {
+  const parsed = parseConfigModuleMetadata(mod, label);
+  if (parsed.skillDirectories.length > 0) {
+    throw new Error("parseConfigModule cannot load skillDirectories synchronously; use loadCodewarperConfigFromPath or parseConfigModuleAsync.");
+  }
+  return buildCodewarperConfig(parsed, []);
+}
+
+function parseConfigModuleMetadata(mod: { default?: unknown }, label: string): ParsedConfigModule {
   const def = mod.default;
   if (!def || typeof def !== "object") {
     throw new Error(`Codewarper config ${label} must default-export an object.`);
@@ -138,14 +166,30 @@ export function parseConfigModule(mod: { default?: unknown }, label: string): Co
   const hooksUnknown = (def as { hooks?: unknown }).hooks;
   const hooks = validateHooks(hooksUnknown);
 
+  const skillDirectoriesUnknown = (def as { skillDirectories?: unknown }).skillDirectories;
+  const skillDirectories = validateSkillDirectories(skillDirectoriesUnknown);
+
   const commandsUnknown = (def as { commands?: unknown }).commands;
   const tools = validateToolsArray(toolsUnknown ?? []);
   const commands = validateCommands(commandsUnknown);
+
   return {
-    tools: loadToolsWithValidators(tools),
+    tools,
     commands,
     systemPrompt: typeof systemPromptUnknown === "string" ? systemPromptUnknown : null,
     hooks,
+    skillDirectories,
+  };
+}
+
+function buildCodewarperConfig(parsed: ParsedConfigModule, skills: CodewarperSkill[]): CodewarperConfig {
+  return {
+    tools: loadToolsWithValidators(parsed.tools),
+    commands: parsed.commands,
+    systemPrompt: parsed.systemPrompt,
+    hooks: parsed.hooks,
+    skills,
+    skillDirectories: parsed.skillDirectories,
   };
 }
 
@@ -161,6 +205,8 @@ function emptyCodewarperConfig(): CodewarperConfig {
     commands: [],
     systemPrompt: null,
     hooks: null,
+    skills: [],
+    skillDirectories: [],
   };
 }
 
@@ -189,6 +235,27 @@ function validateCommands(commandsUnknown: unknown): CodewarperCommand[] {
     commands.push({ name, description: command.description, run: command.run as CodewarperCommand["run"] });
   }
   return commands;
+}
+
+function validateReservedSkillToolName(tools: readonly Tool[], skills: readonly CodewarperSkill[]): void {
+  const hasModelInvocableSkill = skills.some((skill) => !skill.disableModelInvocation);
+  if (!hasModelInvocableSkill) return;
+  if (tools.some((tool) => tool.name === READ_SKILL_TOOL_NAME)) {
+    throw new Error(`Tool name "${READ_SKILL_TOOL_NAME}" is reserved for Codewarper skills.`);
+  }
+}
+
+function validateSkillDirectories(skillDirectoriesUnknown: unknown): string[] {
+  if (typeof skillDirectoriesUnknown === "undefined") return [];
+  if (!Array.isArray(skillDirectoriesUnknown)) {
+    throw new Error("skillDirectories must be a string[] when provided.");
+  }
+  return skillDirectoriesUnknown.map((value, index) => {
+    if (typeof value !== "string" || !value.trim()) {
+      throw new Error(`skillDirectories[${index}] must be a non-empty string.`);
+    }
+    return value.trim();
+  });
 }
 
 function validateToolsArray(toolsUnknown: unknown[]): Tool[] {
