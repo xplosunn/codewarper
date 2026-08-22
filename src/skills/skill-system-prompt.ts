@@ -9,9 +9,10 @@ export function appendSkillGuidanceToSystemPrompt(base: string, skills: readonly
     "",
     "## Codewarper skills",
     "",
-    "This project has configured skills. A skill is a markdown file with specialized instructions for a task.",
+    "This project has configured skills. A skill is a directory package with a primary SKILL.md file.",
     "When a task matches a skill description, call the `read_skill` tool with the skill name, then follow the loaded instructions.",
-    "When skill instructions reference relative paths, resolve them relative to the skill file's directory.",
+    "The loaded skill may list supporting files. Read only the files you need by calling `read_skill` again with the `file` argument.",
+    "When skill instructions reference relative paths, resolve them relative to the skill directory.",
     "",
     "<available_skills>",
   ];

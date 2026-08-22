@@ -111,10 +111,11 @@ test("real provider can load and use a configured skill", { timeout: PROVIDER_TI
   const dir = await mkdtemp(path.join(tmpRoot, "codewarper-skill-integration-"));
   try {
     const skillsDir = path.join(dir, "skills", "nested");
-    await mkdir(skillsDir, { recursive: true });
+    const skillDir = path.join(skillsDir, "nonce-reply");
+    await mkdir(skillDir, { recursive: true });
 
     const nonce = `CW_SKILL_TEST_${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}_OK`;
-    await writeFile(path.join(skillsDir, "nonce-reply.md"), [
+    await writeFile(path.join(skillDir, "SKILL.md"), [
       "---",
       "name: nonce-reply",
       "description: Use only when the user asks for the Codewarper skill integration nonce reply. This skill defines the required nonce response for integration testing.",

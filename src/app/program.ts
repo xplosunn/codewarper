@@ -41,7 +41,7 @@ import type { StepR } from "../step/services.ts";
 import type { LoadedTool } from "../tools/loaded-tool.ts";
 import { appendToolGuidanceToSystemPrompt } from "../tools/tool-system-prompt.ts";
 import { appendSkillGuidanceToSystemPrompt } from "../skills/skill-system-prompt.ts";
-import { createSkillTools, READ_SKILL_TOOL_NAME } from "../skills/skill-tools.ts";
+import { createSkillTools, formatSkillForModel, READ_SKILL_TOOL_NAME } from "../skills/skill-tools.ts";
 import type { CodewarperSkill } from "../skills/types.ts";
 import { parseUserInput } from "./input.ts";
 import type { App, LoopResult, UserInput } from "./types.ts";
@@ -510,9 +510,7 @@ function runSkillCommand(
   const prompt = [
     `Use the ${skill.name} skill.`,
     "",
-    `Skill file: ${skill.filePath}`,
-    "",
-    skill.content,
+    formatSkillForModel(skill),
     ...(args.length > 0 ? ["", "User arguments:", args.join(" ")] : []),
   ].join("\n");
 

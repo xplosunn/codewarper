@@ -5,16 +5,23 @@ import type { CodewarperSkill } from "./types.ts";
 
 const MAX_NAME_LENGTH = 64;
 const MAX_DESCRIPTION_LENGTH = 1024;
+
+type DiscoveredSkill = {
+  filePath: string;
+  directoryPath: string;
+  supportingMarkdownFilePaths: string[];
+};
+
 export async function loadSkillsFromDirectories(skillDirectories: readonly string[]): Promise<CodewarperSkill[]> {
   const skills: CodewarperSkill[] = [];
   const seenNames = new Set<string>();
   for (const rawDir of skillDirectories) {
     const dir = resolveConfiguredPath(rawDir);
-    const files = await discoverMarkdownFiles(dir);
-    for (const filePath of files) {
-      const skill = await loadSkillFromMarkdownFile(filePath);
+    const discoveredSkills = await discoverSkills(dir);
+    for (const discoveredSkill of discoveredSkills) {
+      const skill = await loadSkillFromMarkdownFile(discoveredSkill);
       if (seenNames.has(skill.name)) {
-        throw new Error(`Duplicate skill name "${skill.name}" from ${filePath}.`);
+        throw new Error(`Duplicate skill name "${skill.name}" from ${skill.filePath}.`);
       }
       seenNames.add(skill.name);
       skills.push(skill);
@@ -33,7 +40,7 @@ function resolveConfiguredPath(input: string): string {
   return path.resolve(process.cwd(), trimmed);
 }
 
-async function discoverMarkdownFiles(root: string): Promise<string[]> {
+async function discoverSkills(root: string): Promise<DiscoveredSkill[]> {
   const rootStat = await stat(root).catch((error: unknown) => {
     if (isNotFoundError(error)) return null;
     throw error;
@@ -41,20 +48,20 @@ async function discoverMarkdownFiles(root: string): Promise<string[]> {
   if (rootStat === null) return [];
   if (!rootStat.isDirectory()) throw new Error(`skillDirectories entry is not a directory: ${root}`);
 
-  const files: string[] = [];
-  await walk(root, files);
-  files.sort();
-  return files;
+  const skills: DiscoveredSkill[] = [];
+  await walk(root, skills);
+  skills.sort((a, b) => a.filePath.localeCompare(b.filePath));
+  return skills;
 }
 
-async function walk(dir: string, files: string[]): Promise<void> {
+async function walk(dir: string, skills: DiscoveredSkill[]): Promise<void> {
   const entries = await readdir(dir, { withFileTypes: true });
 
   const skillFile = entries.find((entry) => entry.isFile() && entry.name === "SKILL.md");
   if (skillFile) {
-    // Treat a directory containing SKILL.md as a skill package root. Supporting
-    // markdown under references/, docs/, etc. is not independently loaded as a skill.
-    files.push(path.join(dir, skillFile.name));
+    const filePath = path.join(dir, skillFile.name);
+    const supportingMarkdownFilePaths = await discoverSupportingMarkdownFiles(dir, filePath);
+    skills.push({ filePath, directoryPath: dir, supportingMarkdownFilePaths });
     return;
   }
 
@@ -62,10 +69,29 @@ async function walk(dir: string, files: string[]): Promise<void> {
     if (entry.name === "node_modules" || entry.name === ".git") continue;
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      await walk(fullPath, files);
+      await walk(fullPath, skills);
       continue;
     }
-    if (entry.isFile() && isMarkdownFile(entry.name)) files.push(fullPath);
+  }
+}
+
+async function discoverSupportingMarkdownFiles(root: string, primaryFilePath: string): Promise<string[]> {
+  const files: string[] = [];
+  await walkSupportingMarkdownFiles(root, primaryFilePath, files);
+  files.sort();
+  return files;
+}
+
+async function walkSupportingMarkdownFiles(dir: string, primaryFilePath: string, files: string[]): Promise<void> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === "node_modules" || entry.name === ".git") continue;
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      await walkSupportingMarkdownFiles(fullPath, primaryFilePath, files);
+      continue;
+    }
+    if (entry.isFile() && isMarkdownFile(entry.name) && fullPath !== primaryFilePath) files.push(fullPath);
   }
 }
 
@@ -73,21 +99,31 @@ function isMarkdownFile(fileName: string): boolean {
   return fileName.toLowerCase().endsWith(".md");
 }
 
-async function loadSkillFromMarkdownFile(filePath: string): Promise<CodewarperSkill> {
+function normalizeRelativePath(relativePath: string): string {
+  return relativePath.split(path.sep).join("/");
+}
+
+async function loadSkillFromMarkdownFile(discoveredSkill: DiscoveredSkill): Promise<CodewarperSkill> {
+  const { filePath, directoryPath, supportingMarkdownFilePaths } = discoveredSkill;
   const content = await readFile(filePath, "utf8");
   const { frontmatter } = parseFrontmatter(content, filePath);
-  // Keep loading compatible with skill files from other agents: validate the
-  // fields Codewarper uses, but ignore unknown frontmatter keys.
-  const name = readOptionalString(frontmatter, "name") ?? defaultNameFromFilePath(filePath);
+  // Validate the fields Codewarper uses, but ignore unknown frontmatter keys.
+  const name = readOptionalString(frontmatter, "name") ?? path.basename(directoryPath);
   validateName(name, filePath);
   const description = readRequiredString(frontmatter, "description", filePath);
   validateDescription(description, filePath);
+  const supportingMarkdownFiles = supportingMarkdownFilePaths.map((supportingFilePath) => ({
+    relativePath: normalizeRelativePath(path.relative(directoryPath, supportingFilePath)),
+    filePath: supportingFilePath,
+  }));
 
   return {
     name,
     description,
     filePath,
+    directoryPath,
     content,
+    supportingMarkdownFiles,
     disableModelInvocation: readOptionalBoolean(frontmatter, "disable-model-invocation", filePath) ?? false,
     allowedTools: readAllowedTools(frontmatter["allowed-tools"], filePath),
   };
@@ -185,12 +221,6 @@ function parseScalar(value: string): unknown {
     return inner.split(",").map((part) => String(parseScalar(part.trim())));
   }
   return value;
-}
-
-function defaultNameFromFilePath(filePath: string): string {
-  const base = path.basename(filePath, path.extname(filePath));
-  if (base.toLowerCase() === "skill") return path.basename(path.dirname(filePath));
-  return base;
 }
 
 function readRequiredString(frontmatter: Record<string, unknown>, key: string, filePath: string): string {

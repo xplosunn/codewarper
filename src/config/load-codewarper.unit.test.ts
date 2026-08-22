@@ -16,18 +16,22 @@ function toolSource(name: string): string {
   }`;
 }
 
+async function writeSkillPackage(skillsDir: string, name: string, frontmatterLines: string[] = []): Promise<void> {
+  await mkdir(path.join(skillsDir, name), { recursive: true });
+  await writeFile(path.join(skillsDir, name, "SKILL.md"), [
+    "---",
+    `name: ${name}`,
+    ...frontmatterLines,
+    "---",
+    `# ${name}`,
+  ].join("\n"));
+}
+
 test("loadCodewarperConfigFromPath loads skills from configured directories", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "codewarper-config-skills-"));
   try {
     const skillsDir = path.join(dir, "skills");
-    await mkdir(skillsDir, { recursive: true });
-    await writeFile(path.join(skillsDir, "review.md"), [
-      "---",
-      "name: review",
-      "description: Use when reviewing changes.",
-      "---",
-      "# Review",
-    ].join("\n"));
+    await writeSkillPackage(skillsDir, "review", ["description: Use when reviewing changes."]);
 
     const configPath = path.join(dir, "codewarper.mjs");
     await writeFile(configPath, `export default { skillDirectories: [${JSON.stringify(skillsDir)}] };`);
@@ -45,14 +49,7 @@ test("loadCodewarperConfigFromPath rejects read_skill tool collision when skills
   const dir = await mkdtemp(path.join(tmpdir(), "codewarper-config-skill-collision-"));
   try {
     const skillsDir = path.join(dir, "skills");
-    await mkdir(skillsDir, { recursive: true });
-    await writeFile(path.join(skillsDir, "review.md"), [
-      "---",
-      "name: review",
-      "description: Use when reviewing changes.",
-      "---",
-      "# Review",
-    ].join("\n"));
+    await writeSkillPackage(skillsDir, "review", ["description: Use when reviewing changes."]);
 
     const configPath = path.join(dir, "codewarper.mjs");
     await writeFile(configPath, `export default {
@@ -73,15 +70,10 @@ test("loadCodewarperConfigFromPath allows read_skill user tool when all skills a
   const dir = await mkdtemp(path.join(tmpdir(), "codewarper-config-manual-skill-collision-"));
   try {
     const skillsDir = path.join(dir, "skills");
-    await mkdir(skillsDir, { recursive: true });
-    await writeFile(path.join(skillsDir, "manual.md"), [
-      "---",
-      "name: manual",
+    await writeSkillPackage(skillsDir, "manual", [
       "description: Manual-only skill.",
       "disable-model-invocation: true",
-      "---",
-      "# Manual",
-    ].join("\n"));
+    ]);
 
     const configPath = path.join(dir, "codewarper.mjs");
     await writeFile(configPath, `export default {
