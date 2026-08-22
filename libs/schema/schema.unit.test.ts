@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { compile, formatErrors, SchemaValidationError } from "../../libs/schema/schema.ts";
+import { compile, formatErrors, SchemaCompileError, SchemaValidationError } from "../../libs/schema/schema.ts";
 
 describe("compile", () => {
   it("passes when input matches schema", () => {
@@ -173,6 +173,80 @@ describe("compile", () => {
       (err: unknown) => {
         assert.ok(err instanceof SchemaValidationError);
         assert.ok(err.message.includes("expected object, got array"));
+        return true;
+      },
+    );
+  });
+
+  it("validates arrays with item schemas", () => {
+    const validate = compile({
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          oldText: { type: "string" },
+          newText: { type: "string" },
+        },
+        required: ["oldText", "newText"],
+        additionalProperties: false,
+      },
+    });
+
+    assert.doesNotThrow(() => validate([{ oldText: "a", newText: "b" }]));
+
+    assert.throws(
+      () => validate([{ oldText: "a", newText: 1 }]),
+      (err: unknown) => {
+        assert.ok(err instanceof SchemaValidationError);
+        assert.ok(err.message.includes("$[0].newText: expected string, got number"));
+        return true;
+      },
+    );
+  });
+
+  it("supports integer type", () => {
+    const validate = compile({ type: "integer" });
+
+    assert.doesNotThrow(() => validate(1));
+
+    assert.throws(
+      () => validate(1.5),
+      (err: unknown) => {
+        assert.ok(err instanceof SchemaValidationError);
+        assert.ok(err.message.includes("expected integer, got number"));
+        return true;
+      },
+    );
+  });
+
+  it("rejects unsupported schema types at compile time", () => {
+    assert.throws(
+      () => compile({ type: "null" }),
+      (err: unknown) => {
+        assert.ok(err instanceof SchemaCompileError);
+        assert.ok(err.message.includes('$.type: unsupported JSON Schema type "null"'));
+        return true;
+      },
+    );
+  });
+
+  it("rejects unsupported schema keywords at compile time", () => {
+    assert.throws(
+      () => compile({ type: "string", oneOf: [{ type: "string" }] }),
+      (err: unknown) => {
+        assert.ok(err instanceof SchemaCompileError);
+        assert.ok(err.message.includes("$.oneOf: unsupported JSON Schema keyword"));
+        return true;
+      },
+    );
+  });
+
+  it("rejects unsupported nested schema keywords at compile time", () => {
+    assert.throws(
+      () => compile({ type: "array", items: { type: "string", minLength: 1 } }),
+      (err: unknown) => {
+        assert.ok(err instanceof SchemaCompileError);
+        assert.ok(err.message.includes("$.items.minLength: unsupported JSON Schema keyword"));
         return true;
       },
     );

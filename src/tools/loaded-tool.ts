@@ -1,4 +1,4 @@
-import { compile, formatErrors, type ValidateFunction, type Schema, SchemaValidationError } from "../../libs/schema/schema.ts";
+import { compile, formatErrors, type ValidateFunction, SchemaValidationError } from "../../libs/schema/schema.ts";
 import type { Tool } from "./types.ts";
 
 export type LoadedTool = {
@@ -11,13 +11,10 @@ export function loadToolsWithValidators(tools: Tool[]): LoadedTool[] {
   return tools.map((tool) => {
     let validator: ValidateFunction;
     try {
-      validator = compile(tool.inputSchema as Schema);
+      validator = compile(tool.inputSchema);
     } catch (cause) {
-      const message =
-        cause instanceof Error
-          ? cause.message
-          : `Invalid JSON Schema for tool "${tool.name}" inputSchema.`;
-      throw new Error(message, { cause });
+      const detail = cause instanceof Error ? `: ${cause.message}` : ".";
+      throw new Error(`Invalid JSON Schema for tool "${tool.name}" inputSchema${detail}`, { cause });
     }
 
     const validateInput = (input: unknown): void => {

@@ -45,6 +45,29 @@ test("loadCodewarperConfigFromPath loads skills from configured directories", as
   }
 });
 
+test("loadCodewarperConfigFromPath rejects unsupported tool inputSchema keywords", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "codewarper-config-bad-schema-"));
+  try {
+    const configPath = path.join(dir, "codewarper.mjs");
+    await writeFile(configPath, `export default {
+      tools: [{
+        name: "bad_tool",
+        description: "Test tool.",
+        inputSchema: { type: "object", oneOf: [{ type: "object" }] },
+        getCallStatusMessage() { return "Running test tool"; },
+        run() { return "ok"; },
+      }],
+    };`);
+
+    await assert.rejects(
+      () => Effect.runPromise(loadCodewarperConfigFromPath(configPath)),
+      /Invalid JSON Schema for tool "bad_tool" inputSchema: \$\.oneOf: unsupported JSON Schema keyword/,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("loadCodewarperConfigFromPath rejects read_skill tool collision when skills are model-invocable", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "codewarper-config-skill-collision-"));
   try {
