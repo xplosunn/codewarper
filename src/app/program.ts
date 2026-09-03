@@ -566,14 +566,14 @@ function runPrompt(app: App, text: string): Effect<App, never, PromptR> {
         step(nextConversation, app.sessionConfiguration, signal),
       ),
     );
-    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+    const elapsedMs = Date.now() - startedAt;
 
     if (result._tag === "Right") {
       terminal.show({
         type: "assistant",
         text: result.right.newMessage.text,
       });
-      terminal.show({ type: "timeInfo", text: `⏱️ ${elapsed}s` });
+      terminal.show({ type: "timeInfo", text: `⏱️ ${formatElapsedTime(elapsedMs)}` });
       return {
         ...app,
         conversation: result.right.conversation,
@@ -921,6 +921,16 @@ function promptSelect<T>(
 
 function fromPromise<A>(thunk: () => Promise<A>): Effect<A, Error> {
   return Effect.tryPromise({ try: thunk, catch: toError });
+}
+
+export function formatElapsedTime(elapsedMs: number): string {
+  const totalSeconds = elapsedMs / 1000;
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds - minutes * 60;
+  const rounded = seconds.toFixed(1);
+  if (rounded === "60.0") return `${minutes + 1}m 0.0s`;
+  return `${minutes}m ${rounded}s`;
 }
 
 function isAbortError(error: Error): boolean {
