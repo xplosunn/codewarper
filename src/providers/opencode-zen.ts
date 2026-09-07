@@ -1,10 +1,14 @@
 import { Effect } from "#effect";
 import {
+  CryptoService,
   HttpClientService,
   ProviderAuthStoreService,
+  SystemInfoService,
   TerminalService,
+  type Crypto,
   type ProviderAuth,
   type ProviderAuthStore,
+  type SystemInfo,
   type Terminal,
 } from "./services.ts";
 import type {
@@ -22,6 +26,9 @@ import type { Tool } from "../tools/types.ts";
 
 const PROVIDER_ID = "opencode";
 const PROVIDER_NAME = "OpenCode";
+const OPENCODE_CLIENT = "codewarper";
+const OPENCODE_SESSION_ID_AUTH_KEY = "codewarperOpenCodeSessionId";
+const FALLBACK_OPENCODE_SESSION_ID = `codewarper_${Math.random().toString(16).slice(2)}`;
 const ZEN_BASE_URL = "https://opencode.ai/zen/v1";
 const GO_BASE_URL = "https://opencode.ai/zen/go/v1";
 const MODELS_DEV_URL = "https://models.dev/api.json";
@@ -112,14 +119,15 @@ const ensureAuthenticated = (forceLogin: boolean): Effect<ProviderAuth, Error, P
   Effect.gen(function* () {
     const terminal = yield* TerminalService;
     const authStore = yield* ProviderAuthStoreService;
+    const crypto = yield* CryptoService;
     const savedAuth = authStore.get(PROVIDER_ID);
 
     if (!forceLogin && savedAuth !== null && savedAuth.access.trim()) {
       terminal.show({ type: "system", text: "Using saved OpenCode API key." });
-      return savedAuth;
+      return ensureOpenCodeSessionId(authStore, savedAuth, crypto);
     }
 
-    return yield* promptAndSaveAuth(terminal, authStore);
+    return ensureOpenCodeSessionId(authStore, yield* promptAndSaveAuth(terminal, authStore), crypto);
   });
 
 // ── Option listing (per-model sub-options) ──────────────────────────────
@@ -216,6 +224,44 @@ function promptAndSaveAuth(
   });
 }
 
+function ensureOpenCodeSessionId(
+  authStore: ProviderAuthStore,
+  auth: ProviderAuth,
+  crypto: Crypto,
+): ProviderAuth {
+  const existing = readNonEmptyString(auth[OPENCODE_SESSION_ID_AUTH_KEY]);
+  if (existing) return { ...auth, [OPENCODE_SESSION_ID_AUTH_KEY]: existing };
+
+  const next = `codewarper_${crypto.createRandomHex(16)}`;
+  const updated = { ...auth, [OPENCODE_SESSION_ID_AUTH_KEY]: next };
+  authStore.set(PROVIDER_ID, updated);
+  return updated;
+}
+
+type OpenCodeHeaderOptions = { accept: string; contentType?: string };
+
+function buildOpenCodeHeaders(
+  auth: ProviderAuth,
+  systemInfo: SystemInfo,
+  options: OpenCodeHeaderOptions,
+): Record<string, string> {
+  return {
+    Authorization: `Bearer ${auth.access}`,
+    accept: options.accept,
+    ...(options.contentType ? { "content-type": options.contentType } : {}),
+    "x-opencode-client": OPENCODE_CLIENT,
+    "x-opencode-session": openCodeSessionId(auth),
+    "User-Agent": createUserAgent(systemInfo),
+  };
+}
+
+function openCodeSessionId(auth: ProviderAuth): string {
+  return readNonEmptyString(auth[OPENCODE_SESSION_ID_AUTH_KEY]) ?? FALLBACK_OPENCODE_SESSION_ID;
+}
+
+const createUserAgent = (systemInfo: SystemInfo): string =>
+  `codewarper (${systemInfo.platform()} ${systemInfo.release()}; ${systemInfo.arch()})`;
+
 // ── Model fetching ──────────────────────────────────────────────────────
 
 type FetchEither = { _tag: "Right"; right: OpenCodeModel[] } | { _tag: "Left"; left: Error };
@@ -260,10 +306,11 @@ const fetchSupportedProductModels = (
 const fetchProductModelIds = (auth: ProviderAuth, product: ProductConfig): Effect<string[], Error, ProviderClientR> =>
   Effect.gen(function* () {
     const http = yield* HttpClientService;
+    const systemInfo = yield* SystemInfoService;
     const response = yield* fromPromise(() =>
       http.fetch(product.modelsUrl, {
         method: "GET",
-        headers: { accept: "application/json", Authorization: `Bearer ${auth.access}` },
+        headers: buildOpenCodeHeaders(auth, systemInfo, { accept: "application/json" }),
       }),
     );
 
@@ -366,10 +413,11 @@ function completeResponses(
 ): Effect<ProviderCompletion, Error, ProviderClientR> {
   return Effect.gen(function* () {
     const http = yield* HttpClientService;
+    const systemInfo = yield* SystemInfoService;
     const response = yield* fromPromise(() =>
       http.fetch(resolveResponsesUrl(model.apiUrl), {
         method: "POST",
-        headers: { Authorization: `Bearer ${auth.access}`, accept: "text/event-stream", "content-type": "application/json" },
+        headers: buildOpenCodeHeaders(auth, systemInfo, { accept: "text/event-stream", contentType: "application/json" }),
         body: JSON.stringify(createResponsesRequestBody(model, selection, history, systemPrompt, tools)),
         signal,
       }),
@@ -387,10 +435,11 @@ function completeChatCompletions(
 ): Effect<ProviderCompletion, Error, ProviderClientR> {
   return Effect.gen(function* () {
     const http = yield* HttpClientService;
+    const systemInfo = yield* SystemInfoService;
     const response = yield* fromPromise(() =>
       http.fetch(resolveChatCompletionsUrl(model.apiUrl), {
         method: "POST",
-        headers: { Authorization: `Bearer ${auth.access}`, accept: "application/json", "content-type": "application/json" },
+        headers: buildOpenCodeHeaders(auth, systemInfo, { accept: "application/json", contentType: "application/json" }),
         body: JSON.stringify(createChatCompletionsRequestBody(model, selection, history, systemPrompt, tools)),
         signal,
       }),
