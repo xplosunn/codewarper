@@ -1,7 +1,7 @@
 {
   "name": "codewarper",
   "publishConfig": { "access": "public" },
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "AI coding agent",
   "packageManager": "pnpm@10.9.0",
   "type": "module",
