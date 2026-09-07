@@ -37,15 +37,22 @@ const AUTH_EXPIRY_GRACE_MS = 60_000;
 const AUTH_STATUS_KEY = "codewarperAuthStatus";
 
 /** Reasoning-effort and text-verbosity nested under each model choice. */
-const MODEL_OPTIONS: ProviderOption[] = [
+const REASONING_EFFORT_NAMES: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra high",
+  max: "Max",
+};
+
+const REASONING_EFFORTS = ["low", "medium", "high", "xhigh"] as const;
+const REASONING_EFFORTS_WITH_MAX = [...REASONING_EFFORTS, "max"] as const;
+
+const codexModelOptions = (efforts: readonly string[]): ProviderOption[] => [
   {
     id: "reasoning_effort",
     name: "Reasoning effort",
-    choices: [
-      { id: "low", name: "Low" },
-      { id: "medium", name: "Medium" },
-      { id: "high", name: "High" },
-    ],
+    choices: efforts.map((effort) => ({ id: effort, name: REASONING_EFFORT_NAMES[effort] ?? effort })),
   },
   {
     id: "text_verbosity",
@@ -63,9 +70,11 @@ const OPTIONS: ProviderOption[] = [
     id: "model",
     name: "Model",
     choices: [
-      { id: "gpt-5.5", name: "GPT-5.5", options: MODEL_OPTIONS },
-      { id: "gpt-5.4", name: "GPT-5.4", options: MODEL_OPTIONS },
-      { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", options: MODEL_OPTIONS },
+      { id: "gpt-5.6-sol", name: "GPT-5.6-Sol", options: codexModelOptions(REASONING_EFFORTS_WITH_MAX) },
+      { id: "gpt-5.6-terra", name: "GPT-5.6-Terra", options: codexModelOptions(REASONING_EFFORTS_WITH_MAX) },
+      { id: "gpt-5.6-luna", name: "GPT-5.6-Luna", options: codexModelOptions(REASONING_EFFORTS_WITH_MAX) },
+      { id: "gpt-5.5", name: "GPT-5.5", options: codexModelOptions(REASONING_EFFORTS) },
+      { id: "gpt-5.4-mini", name: "GPT-5.4-Mini", options: codexModelOptions(REASONING_EFFORTS) },
     ],
   },
 ];
