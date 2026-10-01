@@ -281,6 +281,7 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
       `Loaded ${loadedTools.length} tool(s), ${commands.length} command(s), and ${skills.length} skill(s) from ${configOrigin}.`,
       `Provider: ${sessionConfiguration.provider.name}, ${formatSelectionOptions(sessionConfiguration.selection)}`,
       `Loaded commands: ${commands.map((command: CodewarperCommand) => `/${command.name}`).join(", ") || "(none)"}`,
+      "Type /help to see all commands.",
     ]
       .filter(isNonEmptyString)
       .join("\n"),
