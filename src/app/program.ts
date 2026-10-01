@@ -42,7 +42,11 @@ import type { StepR } from "../step/services.ts";
 import type { LoadedTool } from "../tools/loaded-tool.ts";
 import { appendToolGuidanceToSystemPrompt } from "../tools/tool-system-prompt.ts";
 import { appendSkillGuidanceToSystemPrompt } from "../skills/skill-system-prompt.ts";
-import { createSkillTools, formatSkillForModel, READ_SKILL_TOOL_NAME } from "../skills/skill-tools.ts";
+import {
+  createSkillTools,
+  formatSkillForModel,
+  READ_SKILL_TOOL_NAME,
+} from "../skills/skill-tools.ts";
 import type { CodewarperSkill } from "../skills/types.ts";
 import { parseUserInput } from "./input.ts";
 import type { App, LoopResult, UserInput } from "./types.ts";
@@ -92,10 +96,7 @@ export const run: Effect<void, Error, AppR> = Effect.gen(function* () {
 
 // -- Main loop -----------------------------------------------------------
 
-const loop = (
-  app: App,
-  terminal: Terminal,
-): Effect<void, Error, AppR> =>
+const loop = (app: App, terminal: Terminal): Effect<void, Error, AppR> =>
   Effect.gen(function* () {
     terminal.show({ type: "separator" });
 
@@ -188,10 +189,11 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
           const aiHistory: Message[] = [
             { type: "user", text: AI_CONFIG_USER_PROMPT },
           ];
-          const aiResult = yield* terminal.runWithStepAbortSignal((signal: AbortSignal) =>
-            Effect.either(
-              step({ history: aiHistory }, aiSessionConfig, signal),
-            ),
+          const aiResult = yield* terminal.runWithStepAbortSignal(
+            (signal: AbortSignal) =>
+              Effect.either(
+                step({ history: aiHistory }, aiSessionConfig, signal),
+              ),
           );
 
           if (aiResult._tag === "Right") {
@@ -215,8 +217,7 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
         }
         const starter = yield* promptForInitialCodewarperStarter();
         yield* Effect.tryPromise({
-          try: () =>
-            writeInitialCodewarperConfigIfMissing(configPath, starter),
+          try: () => writeInitialCodewarperConfigIfMissing(configPath, starter),
           catch: toError,
         });
         loadedConfig = yield* config.load();
@@ -278,8 +279,7 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
     text: [
       authStatusFromAuth(sessionConfiguration.auth),
       `Loaded ${loadedTools.length} tool(s), ${commands.length} command(s), and ${skills.length} skill(s) from ${configOrigin}.`,
-      `Provider: ${sessionConfiguration.provider.name}`,
-      `Options: ${formatSelectionOptions(sessionConfiguration.selection)}`,
+      `Provider: ${sessionConfiguration.provider.name}, ${formatSelectionOptions(sessionConfiguration.selection)}`,
       `Loaded commands: ${commands.map((command: CodewarperCommand) => `/${command.name}`).join(", ") || "(none)"}`,
     ]
       .filter(isNonEmptyString)
@@ -322,10 +322,18 @@ function sessionWithReloadedConfig(
   };
 }
 
-function withSkillTools(loadedTools: LoadedTool[], skills: CodewarperSkill[]): LoadedTool[] {
+function withSkillTools(
+  loadedTools: LoadedTool[],
+  skills: CodewarperSkill[],
+): LoadedTool[] {
   const skillTools = createSkillTools(skills);
-  if (skillTools.length > 0 && loadedTools.some((loaded) => loaded.tool.name === READ_SKILL_TOOL_NAME)) {
-    throw new Error(`Tool name "${READ_SKILL_TOOL_NAME}" is reserved for Codewarper skills.`);
+  if (
+    skillTools.length > 0 &&
+    loadedTools.some((loaded) => loaded.tool.name === READ_SKILL_TOOL_NAME)
+  ) {
+    throw new Error(
+      `Tool name "${READ_SKILL_TOOL_NAME}" is reserved for Codewarper skills.`,
+    );
   }
   return [...loadedTools, ...skillTools];
 }
@@ -478,10 +486,10 @@ function handleUserInput(
         return { type: "continue" as const, app };
       });
     case "prompt":
-      return Effect.map(
-        runPrompt(app, userInput.text),
-        (nextApp) => ({ type: "continue", app: nextApp }),
-      );
+      return Effect.map(runPrompt(app, userInput.text), (nextApp) => ({
+        type: "continue",
+        app: nextApp,
+      }));
   }
 }
 
@@ -506,10 +514,10 @@ function runSkillCommand(
     ...(args.length > 0 ? ["", "User arguments:", args.join(" ")] : []),
   ].join("\n");
 
-  return Effect.map(
-    runPrompt(app, prompt),
-    (nextApp) => ({ type: "continue" as const, app: nextApp }),
-  );
+  return Effect.map(runPrompt(app, prompt), (nextApp) => ({
+    type: "continue" as const,
+    app: nextApp,
+  }));
 }
 
 function runCustomCommand(
@@ -545,18 +553,14 @@ function runPrompt(app: App, text: string): Effect<App, never, PromptR> {
   return Effect.gen(function* () {
     const terminal = yield* TerminalService;
     const nextConversation = {
-      history: [
-        ...app.conversation.history,
-        { type: "user" as const, text },
-      ],
+      history: [...app.conversation.history, { type: "user" as const, text }],
     };
 
     // Run the step inside the abort-signal scope so Ctrl+C aborts the step
     const startedAt = Date.now();
     const result = yield* terminal.runWithStepAbortSignal(
-      (signal: AbortSignal) => Effect.either(
-        step(nextConversation, app.sessionConfiguration, signal),
-      ),
+      (signal: AbortSignal) =>
+        Effect.either(step(nextConversation, app.sessionConfiguration, signal)),
     );
     const elapsedMs = Date.now() - startedAt;
 
@@ -565,7 +569,10 @@ function runPrompt(app: App, text: string): Effect<App, never, PromptR> {
         type: "assistant",
         text: result.right.newMessage.text,
       });
-      terminal.show({ type: "timeInfo", text: `⏱️ ${formatElapsedTime(elapsedMs)}` });
+      terminal.show({
+        type: "timeInfo",
+        text: `⏱️ ${formatElapsedTime(elapsedMs)}`,
+      });
       return {
         ...app,
         conversation: result.right.conversation,
@@ -608,9 +615,10 @@ function runPrompt(app: App, text: string): Effect<App, never, PromptR> {
     };
 
     const steerResult = yield* terminal.runWithStepAbortSignal(
-      (signal: AbortSignal) => Effect.either(
-        step(steeredConversation, app.sessionConfiguration, signal),
-      ),
+      (signal: AbortSignal) =>
+        Effect.either(
+          step(steeredConversation, app.sessionConfiguration, signal),
+        ),
     );
 
     if (steerResult._tag === "Right") {
@@ -831,7 +839,10 @@ function collectOptionsLevel<R extends Record<string, unknown>>(
       const choice = yield* promptSelect<ProviderOptionChoice>(
         terminal,
         `Pick ${option.name}:`,
-        option.choices.map((c: ProviderOptionChoice) => ({ label: c.name, value: c })),
+        option.choices.map((c: ProviderOptionChoice) => ({
+          label: c.name,
+          value: c,
+        })),
       );
       collected[option.id] = choice.id;
       if (choice.options) {
@@ -875,9 +886,7 @@ function formatSelectionOptions(selection: ProviderSelection): string {
     .join(", ");
 }
 
-function authStatusFromAuth(
-  auth: SessionConfiguration["auth"],
-): string | null {
+function authStatusFromAuth(auth: SessionConfiguration["auth"]): string | null {
   const status = auth[AUTH_STATUS_KEY];
   return typeof status === "string" && status.trim() ? status : null;
 }
