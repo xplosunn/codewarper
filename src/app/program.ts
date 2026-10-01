@@ -3,6 +3,7 @@ import {
   CodewarperConfigService,
   DEFAULT_CONFIG_FILENAME,
   parseConfigModule,
+  type CodewarperCommand,
 } from "../config/load-codewarper.ts";
 import {
   codewarperConfigExists,
@@ -54,15 +55,6 @@ const SYSTEM_PROMPT = [
   "Be practical and direct.",
 ].join("\n");
 
-const BUILT_IN_COMMANDS_HELP = [
-  "/help",
-  "/quit",
-  "/exit",
-  "/model",
-  "/login",
-  "/reload",
-  "/skill <name>",
-];
 const AUTH_STATUS_KEY = "codewarperAuthStatus";
 
 // -- R type definitions --------------------------------------------------
@@ -288,7 +280,7 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
       `Loaded ${loadedTools.length} tool(s), ${commands.length} command(s), and ${skills.length} skill(s) from ${configOrigin}.`,
       `Provider: ${sessionConfiguration.provider.name}`,
       `Options: ${formatSelectionOptions(sessionConfiguration.selection)}`,
-      `Commands: ${formatCommandsHelp(commands)}`,
+      `Loaded commands: ${commands.map((command: CodewarperCommand) => `/${command.name}`).join(", ") || "(none)"}`,
     ]
       .filter(isNonEmptyString)
       .join("\n"),
@@ -881,13 +873,6 @@ function formatSelectionOptions(selection: ProviderSelection): string {
   return Object.entries(selection.options)
     .map(([key, value]) => `${key}=${value}`)
     .join(", ");
-}
-
-function formatCommandsHelp(commands: App["commands"]): string {
-  return [
-    ...BUILT_IN_COMMANDS_HELP,
-    ...commands.map((command) => `/${command.name}`),
-  ].join(", ");
 }
 
 function authStatusFromAuth(
