@@ -3,6 +3,7 @@ import { Context } from "#effect";
 export interface AuthStore<AuthValue> {
   get(providerId: string): AuthValue | null;
   set(providerId: string, auth: AuthValue): void;
+  remove(providerId: string): void;
 }
 
 export interface FileSystem {

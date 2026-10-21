@@ -24,6 +24,12 @@ export function createAuthStore<AuthValue>(
         withProviderAuth(readAuthData<AuthValue>(runtime, filePath), providerId, auth),
       );
     },
+    remove(providerId) {
+      const data = readAuthData<AuthValue>(runtime, filePath);
+      if (!(providerId in data)) return;
+      const { [providerId]: _removed, ...remaining } = data;
+      writeAuthData(runtime, filePath, remaining);
+    },
   };
 }
 

@@ -32,6 +32,7 @@ import type {
 } from "../providers/index.ts";
 import { ModelProvidersService } from "../providers/index.ts";
 import {
+  ProviderAuthStoreService,
   TerminalService,
   type SelectOption,
   type Terminal,
@@ -728,25 +729,63 @@ function promptForLoginSessionSelection(
   );
 }
 
+type LoginRecoveryChoice = "revoke" | "another_provider";
+
 function promptForSessionSelectionWithForceLogin(
   shouldForceLogin: (provider: Provider) => boolean,
 ): Effect<SessionSelection, Error, AppR> {
   return Effect.gen(function* () {
     const terminal = yield* TerminalService;
     const modelProviders = yield* ModelProvidersService;
-    const provider = yield* promptSelect(
-      terminal,
-      "Pick a provider:",
-      modelProviders.all.map((provider: Provider) => ({
-        label: provider.name,
-        value: provider,
-      })),
-    );
-    const auth = yield* provider.ensureAuthenticated(
-      shouldForceLogin(provider),
-    );
-    const selection = yield* selectProviderOptions(provider, auth);
-    return { provider, auth, selection };
+    const authStore = yield* ProviderAuthStoreService;
+
+    while (true) {
+      const provider = yield* promptSelect(
+        terminal,
+        "Pick a provider:",
+        modelProviders.all.map((provider: Provider) => ({
+          label: provider.name,
+          value: provider,
+        })),
+      );
+
+      const result = yield* Effect.either(
+        Effect.gen(function* () {
+          const auth = yield* provider.ensureAuthenticated(
+            shouldForceLogin(provider),
+          );
+          const selection = yield* selectProviderOptions(provider, auth);
+          return { provider, auth, selection };
+        }),
+      );
+
+      if (result._tag === "Right") return result.right;
+
+      terminal.show({
+        type: "error",
+        text: `${provider.name} login failed: ${result.left.message}`,
+      });
+
+      const recovery = yield* promptSelect<LoginRecoveryChoice>(
+        terminal,
+        "What would you like to do?",
+        [
+          {
+            label: `Revoke saved ${provider.name} credentials and try again`,
+            value: "revoke",
+          },
+          { label: "Login to another provider", value: "another_provider" },
+        ],
+      );
+
+      if (recovery === "revoke") {
+        authStore.remove(provider.id);
+        terminal.show({
+          type: "system",
+          text: `Revoked saved ${provider.name} credentials.`,
+        });
+      }
+    }
   });
 }
 
