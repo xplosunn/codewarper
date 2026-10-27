@@ -89,11 +89,20 @@ type StartupConfigChoice =
 
 // -- Entry point ---------------------------------------------------------
 
-export const run: Effect<void, Error, AppR> = Effect.gen(function* () {
-  const app = yield* initializeApp;
-  const terminal = yield* TerminalService;
-  yield* loop(app, terminal);
-});
+export type RunOptions = {
+  prompt?: string;
+};
+
+export const run = (options: RunOptions = {}): Effect<void, Error, AppR> =>
+  Effect.gen(function* () {
+    const app = yield* initializeApp;
+    if (options.prompt !== undefined) {
+      yield* runPromptOnce(app, options.prompt);
+      return;
+    }
+    const terminal = yield* TerminalService;
+    yield* loop(app, terminal);
+  });
 
 // -- Main loop -----------------------------------------------------------
 
@@ -548,6 +557,33 @@ function runCustomCommand(
     else if (result.right.trim())
       terminal.show({ type: "system", text: result.right });
     return { type: "continue" as const, app };
+  });
+}
+
+function runPromptOnce(app: App, text: string): Effect<void, Error, PromptR> {
+  return Effect.gen(function* () {
+    const terminal = yield* TerminalService;
+    const nextConversation = {
+      history: [...app.conversation.history, { type: "user" as const, text }],
+    };
+
+    const startedAt = Date.now();
+    const result = yield* terminal.runWithStepAbortSignal(
+      (signal: AbortSignal) =>
+        Effect.either(step(nextConversation, app.sessionConfiguration, signal)),
+    );
+    const elapsedMs = Date.now() - startedAt;
+
+    if (result._tag === "Left") return yield* Effect.fail(result.left);
+
+    terminal.show({
+      type: "assistant",
+      text: result.right.newMessage.text,
+    });
+    terminal.show({
+      type: "timeInfo",
+      text: `⏱️ ${formatElapsedTime(elapsedMs)}`,
+    });
   });
 }
 
