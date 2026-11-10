@@ -95,7 +95,7 @@ export type RunOptions = {
 
 export const run = (options: RunOptions = {}): Effect<void, Error, AppR> =>
   Effect.gen(function* () {
-    const app = yield* initializeApp;
+    const app = yield* initializeApp({ nonInteractive: options.prompt !== undefined });
     if (options.prompt !== undefined) {
       yield* runPromptOnce(app, options.prompt);
       return;
@@ -146,7 +146,7 @@ function handleUserInputReturningToPromptOnAbort(
 
 // -- App initialization --------------------------------------------------
 
-const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
+const initializeApp = (options: { nonInteractive: boolean }): Effect<App, Error, AppR> => Effect.gen(function* () {
   const terminal = yield* TerminalService;
   const preferences = yield* PreferencesStoreService;
   const config = yield* CodewarperConfigService;
@@ -159,6 +159,14 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
     catch: toError,
   });
   let configOrigin = configExists ? configPath : "(no config file)";
+
+  if (!configExists && options.nonInteractive) {
+    return yield* Effect.fail(
+      new Error(
+        "No Codewarper config found. Run codewarper interactively once to create a config before using -p/--prompt.",
+      ),
+    );
+  }
 
   if (!configExists) {
     const choice = yield* promptForMissingConfigChoice();
@@ -268,6 +276,13 @@ const initializeApp: Effect<App, Error, AppR> = Effect.gen(function* () {
 
   const savedSelection = preferences.getProviderSelection();
   const restoredSession = yield* restoreSavedSession(savedSelection);
+  if (options.nonInteractive && restoredSession === null) {
+    return yield* Effect.fail(
+      new Error(
+        "No saved provider login/model. Run codewarper interactively once to log in and pick a model before using -p/--prompt.",
+      ),
+    );
+  }
   const selection =
     restoredSession ?? (yield* promptForSessionSelection(false));
   saveProviderSelection(preferences, selection.selection);
