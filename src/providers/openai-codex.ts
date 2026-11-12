@@ -70,11 +70,13 @@ const OPTIONS: ProviderOption[] = [
     id: "model",
     name: "Model",
     choices: [
+      { id: "gpt-6.1-sol", name: "GPT-6.1-Sol", options: codexModelOptions(REASONING_EFFORTS_WITH_MAX) },
+      { id: "gpt-6-astra", name: "GPT-6-Astra", options: codexModelOptions(REASONING_EFFORTS_WITH_MAX) },
+      { id: "gpt-6-sol", name: "GPT-6-Sol", options: codexModelOptions(REASONING_EFFORTS_WITH_MAX) },
+      { id: "gpt-6-luna", name: "GPT-6-Luna", options: codexModelOptions(REASONING_EFFORTS_WITH_MAX) },
       { id: "gpt-5.6-sol", name: "GPT-5.6-Sol", options: codexModelOptions(REASONING_EFFORTS_WITH_MAX) },
       { id: "gpt-5.6-terra", name: "GPT-5.6-Terra", options: codexModelOptions(REASONING_EFFORTS_WITH_MAX) },
       { id: "gpt-5.6-luna", name: "GPT-5.6-Luna", options: codexModelOptions(REASONING_EFFORTS_WITH_MAX) },
-      { id: "gpt-5.5", name: "GPT-5.5", options: codexModelOptions(REASONING_EFFORTS) },
-      { id: "gpt-5.4-mini", name: "GPT-5.4-Mini", options: codexModelOptions(REASONING_EFFORTS) },
     ],
   },
 ];
